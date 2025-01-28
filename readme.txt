@@ -1,80 +1,88 @@
 === Tutor LMS BunnyNet Integration ===
-Contributors: themeum
+Contributors: themeum, bmeyer
 Donate link: https://www.themeum.com
-Tags: tutor, lms, bunnynet, video, streaming
+Tags: tutor, lms, bunnynet, video, streaming, api
 Requires at least: 5.3
 Tested up to: 6.4
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 2.0.0
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
-Host your videos on BunnyNet bufferless high-speed streaming platform, and facilitate the videos to your students on your LMS platform powered by Tutor LMS.
+Seamlessly integrate Bunny.net’s bufferless high-speed video streaming platform with Tutor LMS, leveraging Bunny.net's robust API for enhanced video management and delivery.
 
 == Description ==
 
-BunnyNet CDN offers bufferless high-speed streaming from anywhere in the world. This is accomplished by Bunny Stream, their premium streaming solution. Bunny stream uses a state-of-the-art CDN to store and deliver your videos whenever and wherever you need them. It offers robust security even offering hotlink protection and all of this in a very affordable package. 
+Bunny.net offers bufferless high-speed video streaming from anywhere in the world via Bunny Stream, their premium streaming solution. With state-of-the-art CDN technology, Bunny Stream securely stores and delivers your videos to your students wherever they are.
 
-Tutor LMS BunnyNet integration allows you to host your lesson videos on Tutor LMS using BunnNets' very own Bunny Stream. Your students all around the world will face no trouble loading up and playing your meticulously crafted course videos. This enhances the experience for students and you can rest easy knowing your videos are being delivered as intended.
+Tutor LMS BunnyNet Integration takes video management to the next level by leveraging Bunny.net's API to streamline your course creation process. With features like automatic video uploads, user-specific collections, and real-time video management directly in the Tutor LMS dashboard, this plugin ensures that your videos are securely hosted and efficiently delivered.
 
-= Pre-requisites =
+= Features =
 
-For this integration, you need to install the Tutor LMS Free plugin because this plugin comes as an add-on plugin for the Tutor LMS to facilitate the BunnyNet video streaming service.
+- Seamless integration with Bunny.net's API.
+- Automatic creation and management of user-specific collections for instructors.
+- Direct video uploads to Bunny.net from the WordPress dashboard.
+- Enhanced security and video playback performance.
+- Improved workflow for managing course videos.
 
+= Prerequisites =
+
+To use this plugin, you need:
+1. Tutor LMS Free plugin (version 2.1.2 or higher).
+2. Bunny.net account with Bunny Stream enabled.
 
 = Get Started =
 
-Step One: After installing Tutor LMS and the Tutor LMS BunnyNet Integration plugin, navigate to "Tutor LMS > Settings > Course". From there scroll down to the preferred video source and find the BunnyNet option.
+Step 1: After installing Tutor LMS and the Tutor LMS BunnyNet Integration plugin, navigate to "Tutor LMS > Settings > Course". From there scroll down to the preferred video source and find the BunnyNet option.
 
-You need to toggle BunnyNet as your preferred video source.
+Step 2: Navigate to "Settings > Bunny.net Settings". Enter your Bunny.net Access Key and configure your Library.
 
-Step Two: Then log in to your BunnyNet account and open your video. This will bring you to the BunnyNet video setup. Here, you can set a thumbnail for your video, set a title, configure captions and so much more. 
-
-Step Three: Now you just need to copy the "Direct Play URL" from BunnyNet and go back to Tutor LMS. Then, simply paste the URL/link into the Course Intro or Lesson video field.
-
-And there you have it, your video source will then be set to BunnyNet for you and your students to enjoy smooth streaming.
+Step 3: Use the API-powered video uploader available in the lesson and course editor pages. This allows you to upload videos directly to Bunny.net, automatically associating them with the correct user collection.
 
 == Installation ==
 
 = Minimum Requirements =
 
-* PHP version 7.2 or greater (PHP 7.4 or greater is recommended)
-* MySQL version 5.0 or greater (MySQL 5.6 or greater is recommended)
+* PHP version 7.4 or greater.
+* MySQL version 5.6 or greater (MySQL 5.7+ recommended).
 
-= Automatic installation =
+= Automatic Installation =
 
-The automatic installation is the easiest way to install any plugin in WordPress. You can perform an automatic installation of Tutor LMS BunnyNet Integration plugin by logging in to your WordPress dashboard, navigating to the "Plugins" menu and click on the "Add New" button.
+To install Tutor LMS BunnyNet Integration, log in to your WordPress dashboard, navigate to the "Plugins" menu, and click "Add New." Search for "Tutor LMS BunnyNet Integration" and click "Install Now." Once installed, activate the plugin to get started.
 
-This will open up a page showing all the available plugins in WordPress. In the search field, type Tutor LMS BunnyNet Integration. The search result will show you our plugin, you can then see the detailed info by clicking on "More Details" and to install just click on the "Install Now" button.
+= Manual Installation =
 
-= Manual installation =
-
-To install Tutor LMS BunnyNet Integration manually, you need to download the plugin and upload it to your webserver via any FTP application.
-
-The WordPress codex contains [instructions on how to do this here](https://codex.wordpress.org/Managing_Plugins#Manual_Plugin_Installation).
+1. Download the plugin.
+2. Upload the plugin files to the `/wp-content/plugins/tutor-bunny` directory, or install the plugin through the WordPress plugins screen directly.
+3. Activate the plugin through the 'Plugins' screen in WordPress.
 
 == Frequently Asked Questions ==
 
-= Does this Plugin has any Dependency? =
+= Does this plugin have any dependencies? =
+Yes, you must install the Tutor LMS plugin to use this integration.
 
-Yes, You need tutor regular plugin in order to use this plugin, You can migrate LearnPress data if exists. Take a backaup of your full website before migrate.
-
-= Will this Plugin work with the older versions of Tutor LMS? =
-
-The compatibility of Tutor LMS BunnyNet Integration plugin has come on Tutor LMS 2.1.2, therefore you need at least this version of Tutor LMS to use the plugin. 
+= Will this plugin work with older versions of Tutor LMS? =
+No, you need Tutor LMS version 2.1.2 or higher for this plugin to function correctly.
 
 == Screenshots ==
 
-1. Set Video Source Type
-2. Copy URL of the Video
-3. Put Video URL to run the Video
+1. BunnyNet settings page in Tutor LMS.
+2. Video upload interface with API integration.
+3. Video playback within a course.
 
 == Changelog ==
 
-= 1.0.0 - 15 November, 2022 =
+= 2.0.0 - 28 January, 2025 =
+* Complete overhaul to use Bunny.net's API for video uploads and management.
+* Automatic collection creation for instructors.
+* Streamlined video uploading and management in the WordPress dashboard.
+* Refactored and optimized code for multisite compatibility.
+* Added improved error handling and admin feedback.
 
-* Initial Release
+= 1.0.0 - 15 November, 2022 =
+* Initial release with iframe-based video URL support.
 
 == Upgrade Notice ==
 
-None Available
+= 2.0.0 =
+This version introduces major changes, including API integration with Bunny.net. Users upgrading from version 1.0.0 should reconfigure their Bunny.net Access Key and Library ID in the settings page.
