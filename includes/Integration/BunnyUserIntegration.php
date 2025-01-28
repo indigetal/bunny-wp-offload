@@ -1,5 +1,5 @@
 <?php
-namespace Tutor\BunnyNetIntegration\Integration;
+namespace WPBunnyStream\Integration;
 
 if (!defined('ABSPATH')) {
     exit; // Exit if accessed directly.
@@ -9,8 +9,34 @@ class BunnyUserIntegration {
 
     public function __construct() {
         // Hook into user actions
-        add_action('tutor_video_upload', [$this, 'handleVideoUpload'], 10, 2);
+        add_action('wp_bunny_video_upload', [$this, 'handleVideoUpload'], 10, 2);
         add_action('delete_user', [$this, 'handleUserDeletion']);
+    }
+
+    /**
+     * Validate and process WordPress request for video uploads.
+     *
+     * @param array $request The $_POST and $_FILES data for the upload.
+     *
+     * @return array|\WP_Error Processed request data or error.
+     */
+    public function validateUploadRequest($request) {
+        // Verify user permissions.
+        if (!current_user_can('upload_files')) {
+            return new \WP_Error('unauthorized_access', __('Unauthorized access.', 'wp-bunnystream'));
+        }
+
+        // Check for uploaded file and post ID.
+        if (empty($request['file']) || empty($request['post_id'])) {
+            return new \WP_Error('missing_parameters', __('Missing file or post ID.', 'wp-bunnystream'));
+        }
+
+        // Sanitize post ID.
+        $postId = (int) sanitize_text_field($request['post_id']);
+        return [
+            'file' => $request['file'],
+            'post_id' => $postId,
+        ];
     }
 
     /**
@@ -39,7 +65,16 @@ class BunnyUserIntegration {
             $dbManager->storeUserCollection($userId, $collectionId);
         }
 
-        // Associate video with the collection (future implementation)
+        // Use BunnyApi to upload the video
+        $bunnyApi = $GLOBALS['bunny_net_api'];
+        $uploadResponse = $bunnyApi->uploadVideo($videoPath, $collectionId);
+
+        if (is_wp_error($uploadResponse)) {
+            error_log('Video upload failed for user ' . $userId . ': ' . $uploadResponse->get_error_message());
+            return;
+        }
+
+        // Log or process success
         error_log("Video uploaded by user {$userId} added to collection {$collectionId}.");
     }
 

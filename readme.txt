@@ -1,88 +1,57 @@
-=== Tutor LMS BunnyNet Integration ===
-Contributors: themeum, bmeyer
-Donate link: https://www.themeum.com
-Tags: tutor, lms, bunnynet, video, streaming, api
+=== WP Bunny Stream ===
+Contributors: Brandon Meyer
+Tags: wordpress, media library, bunnynet, video streaming, video organization
 Requires at least: 5.3
 Tested up to: 6.4
 Requires PHP: 7.4
-Stable tag: 2.0.0
+Stable tag: 0.1.0
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
-Seamlessly integrate Bunny.net’s bufferless high-speed video streaming platform with Tutor LMS, leveraging Bunny.net's robust API for enhanced video management and delivery.
+Streamline your video management with WP Bunny Stream. Automatically upload, organize, and stream videos using Bunny.net's HTTP API, fully integrated with the WordPress Media Library.
 
 == Description ==
 
-Bunny.net offers bufferless high-speed video streaming from anywhere in the world via Bunny Stream, their premium streaming solution. With state-of-the-art CDN technology, Bunny Stream securely stores and delivers your videos to your students wherever they are.
+WP Bunny Stream enables video offloading and streaming management by integrating Bunny.net's HTTP API with the WordPress Media Library. Videos uploaded to the Media Library are automatically offloaded to Bunny.net, ensuring high-speed, bufferless streaming. 
 
-Tutor LMS BunnyNet Integration takes video management to the next level by leveraging Bunny.net's API to streamline your course creation process. With features like automatic video uploads, user-specific collections, and real-time video management directly in the Tutor LMS dashboard, this plugin ensures that your videos are securely hosted and efficiently delivered.
+Key features:
 
-= Features =
+- Automatically upload videos to Bunny.net when added to the WordPress Media Library.
+- Organize videos into user-specific collections for better management and scalability.
+- Ensure seamless streaming with Bunny.net's global CDN infrastructure.
+- Fully integrates with WordPress workflows, enhancing the user experience.
 
-- Seamless integration with Bunny.net's API.
-- Automatic creation and management of user-specific collections for instructors.
-- Direct video uploads to Bunny.net from the WordPress dashboard.
-- Enhanced security and video playback performance.
-- Improved workflow for managing course videos.
-
-= Prerequisites =
-
-To use this plugin, you need:
-1. Tutor LMS Free plugin (version 2.1.2 or higher).
-2. Bunny.net account with Bunny Stream enabled.
-
-= Get Started =
-
-Step 1: After installing Tutor LMS and the Tutor LMS BunnyNet Integration plugin, navigate to "Tutor LMS > Settings > Course". From there scroll down to the preferred video source and find the BunnyNet option.
-
-Step 2: Navigate to "Settings > Bunny.net Settings". Enter your Bunny.net Access Key and configure your Library.
-
-Step 3: Use the API-powered video uploader available in the lesson and course editor pages. This allows you to upload videos directly to Bunny.net, automatically associating them with the correct user collection.
+No need for manual video handling—WP Bunny Stream takes care of everything behind the scenes, letting you focus on your content.
 
 == Installation ==
 
 = Minimum Requirements =
 
-* PHP version 7.4 or greater.
-* MySQL version 5.6 or greater (MySQL 5.7+ recommended).
+* WordPress 5.3 or greater
+* PHP 7.4 or greater
 
-= Automatic Installation =
+= Installation Instructions =
 
-To install Tutor LMS BunnyNet Integration, log in to your WordPress dashboard, navigate to the "Plugins" menu, and click "Add New." Search for "Tutor LMS BunnyNet Integration" and click "Install Now." Once installed, activate the plugin to get started.
-
-= Manual Installation =
-
-1. Download the plugin.
-2. Upload the plugin files to the `/wp-content/plugins/tutor-bunny` directory, or install the plugin through the WordPress plugins screen directly.
-3. Activate the plugin through the 'Plugins' screen in WordPress.
+1. Download and install WP Bunny Stream through your WordPress dashboard or manually upload the plugin files to your `/wp-content/plugins/` directory.
+2. Activate the plugin through the 'Plugins' menu in WordPress.
+3. Navigate to "Settings > Bunny.net Settings" to configure your Bunny.net API credentials and Library ID.
+4. Upload videos to your WordPress Media Library and let WP Bunny Stream handle the rest!
 
 == Frequently Asked Questions ==
 
-= Does this plugin have any dependencies? =
-Yes, you must install the Tutor LMS plugin to use this integration.
+= What is Bunny.net? =
+Bunny.net is a high-speed, global CDN with advanced video streaming solutions. It ensures seamless video delivery to users anywhere in the world.
 
-= Will this plugin work with older versions of Tutor LMS? =
-No, you need Tutor LMS version 2.1.2 or higher for this plugin to function correctly.
+= Do I need a Bunny.net account to use this plugin? =
+Yes, you'll need an active Bunny.net account and access to their video streaming service to use WP Bunny Stream.
 
-== Screenshots ==
-
-1. BunnyNet settings page in Tutor LMS.
-2. Video upload interface with API integration.
-3. Video playback within a course.
+= Does this work with multisite networks? =
+Yes, WP Bunny Stream is fully compatible with WordPress multisite networks.
 
 == Changelog ==
 
-= 2.0.0 - 28 January, 2025 =
-* Complete overhaul to use Bunny.net's API for video uploads and management.
-* Automatic collection creation for instructors.
-* Streamlined video uploading and management in the WordPress dashboard.
-* Refactored and optimized code for multisite compatibility.
-* Added improved error handling and admin feedback.
-
-= 1.0.0 - 15 November, 2022 =
-* Initial release with iframe-based video URL support.
+= 0.1.0 =
+* Automatic video uploading to Bunny.net via the HTTP API.
+* Added support for user-specific video collections.
 
 == Upgrade Notice ==
-
-= 2.0.0 =
-This version introduces major changes, including API integration with Bunny.net. Users upgrading from version 1.0.0 should reconfigure their Bunny.net Access Key and Library ID in the settings page.

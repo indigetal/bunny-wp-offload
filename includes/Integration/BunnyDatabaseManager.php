@@ -1,6 +1,6 @@
 <?php 
 
-namespace Tutor\BunnyNetIntegration\Integration;
+namespace WPBunnyStream\Integration;
 
 if (!defined('ABSPATH')) {
     exit; // Exit if accessed directly.
@@ -10,11 +10,19 @@ class BunnyDatabaseManager {
 
     /**
      * Create the collections table for storing user-collection associations.
+     * Supports multisite environments.
      */
-    public static function createCollectionsTable() {
+    public static function createCollectionsTable($networkWide = false) {
         global $wpdb;
 
-        $table_name = $wpdb->prefix . 'bunny_collections';
+        if ($networkWide && is_multisite()) {
+            // Create a single network-wide table
+            $table_name = $wpdb->base_prefix . 'bunny_collections';
+        } else {
+            // Create a site-specific table
+            $table_name = $wpdb->prefix . 'bunny_collections';
+        }
+
         $charset_collate = $wpdb->get_charset_collate();
 
         $sql = "CREATE TABLE $table_name (
@@ -33,14 +41,19 @@ class BunnyDatabaseManager {
 
     /**
      * Retrieve the collection ID associated with a user.
+     * Supports multisite environments.
      *
      * @param int $userId The user ID.
+     * @param bool $networkWide Whether to query the network-wide table.
      * @return string|null The collection ID or null if not found.
      */
-    public function getUserCollectionId($userId) {
+    public function getUserCollectionId($userId, $networkWide = false) {
         global $wpdb;
 
-        $table_name = $wpdb->prefix . 'bunny_collections';
+        $table_name = $networkWide && is_multisite()
+            ? $wpdb->base_prefix . 'bunny_collections'
+            : $wpdb->prefix . 'bunny_collections';
+
         $collection_id = $wpdb->get_var($wpdb->prepare(
             "SELECT collection_id FROM $table_name WHERE user_id = %d LIMIT 1",
             $userId
@@ -51,15 +64,20 @@ class BunnyDatabaseManager {
 
     /**
      * Store a user-to-collection association.
+     * Supports multisite environments.
      *
      * @param int $userId The user ID.
      * @param string $collectionId The Bunny.net collection ID.
+     * @param bool $networkWide Whether to use the network-wide table.
      * @return void
      */
-    public function storeUserCollection($userId, $collectionId) {
+    public function storeUserCollection($userId, $collectionId, $networkWide = false) {
         global $wpdb;
 
-        $table_name = $wpdb->prefix . 'bunny_collections';
+        $table_name = $networkWide && is_multisite()
+            ? $wpdb->base_prefix . 'bunny_collections'
+            : $wpdb->prefix . 'bunny_collections';
+
         $wpdb->insert(
             $table_name,
             [
@@ -73,14 +91,19 @@ class BunnyDatabaseManager {
 
     /**
      * Delete the collection record associated with a user.
+     * Supports multisite environments.
      *
      * @param int $userId The user ID.
+     * @param bool $networkWide Whether to use the network-wide table.
      * @return void
      */
-    public function deleteUserCollection($userId) {
+    public function deleteUserCollection($userId, $networkWide = false) {
         global $wpdb;
 
-        $table_name = $wpdb->prefix . 'bunny_collections';
+        $table_name = $networkWide && is_multisite()
+            ? $wpdb->base_prefix . 'bunny_collections'
+            : $wpdb->prefix . 'bunny_collections';
+
         $wpdb->delete(
             $table_name,
             ['user_id' => $userId],

@@ -21,6 +21,17 @@ document.addEventListener("DOMContentLoaded", function () {
     formData.append("action", "bunny_video_upload");
     formData.append("video", file);
 
+    // Check if additional metadata like post ID or collection ID is needed
+    const postId = uploadButton.dataset.postId;
+    if (postId) {
+      formData.append("post_id", postId);
+    }
+
+    const collectionId = uploadButton.dataset.collectionId;
+    if (collectionId) {
+      formData.append("collection_id", collectionId);
+    }
+
     // Display loading message
     statusMessage.textContent = "Uploading...";
     statusMessage.style.color = "blue";
@@ -34,6 +45,15 @@ document.addEventListener("DOMContentLoaded", function () {
         if (data.success) {
           statusMessage.textContent = "Video uploaded successfully!";
           statusMessage.style.color = "green";
+
+          // Optionally update UI with uploaded video details
+          if (data.video_url) {
+            const videoPreview = document.getElementById("bunny-video-preview");
+            if (videoPreview) {
+              videoPreview.src = data.video_url;
+              videoPreview.style.display = "block";
+            }
+          }
         } else {
           statusMessage.textContent = `Error: ${data.message || "Unknown error occurred."}`;
           statusMessage.style.color = "red";
