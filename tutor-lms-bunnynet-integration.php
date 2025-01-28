@@ -30,6 +30,10 @@ function tutor_lms_bunnynet_integration_init() {
     $access_key = get_option('bunny_net_access_key', '');
     $library_id = get_option('bunny_net_library_id', '');
 
+    // Initialize BunnySettings to ensure the settings page appears.
+    new \Tutor\BunnyNetIntegration\Admin\BunnySettings();
+
+    // Global Bunny.net API instance (optional).
     if (!empty($access_key) && !empty($library_id)) {
         $GLOBALS['bunny_net_api'] = new \Tutor\BunnyNetIntegration\Integration\BunnyApi($access_key, $library_id);
     }
