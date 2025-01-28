@@ -116,6 +116,12 @@ class BunnySettings {
     public function renderAccessKeyField() {
         $value = esc_attr(get_option(self::OPTION_ACCESS_KEY, ''));
         echo "<input type='text' name='" . self::OPTION_ACCESS_KEY . "' value='$value' class='regular-text' />";
+        echo '<p class="description">';
+        echo sprintf(
+            __('To learn how to obtain your stream API key, see <a href="%s" target="_blank">How to obtain your Stream API key guide</a>.', 'tutor-lms-bunnynet-integration'),
+            'https://support.bunny.net/hc/en-us/articles/13503339878684-How-to-find-your-stream-API-key'
+        );
+        echo '</p>';
     }
 
     /**
@@ -130,7 +136,7 @@ class BunnySettings {
      * Render the Manual Video Creation button.
      */
     public function renderManualVideoCreationButton() {
-        echo '<p>' . esc_html__('A video object is automatically created when the Library ID and API Key are saved, but you can manually create a new video object if necessary.', 'tutor-lms-bunnynet-integration') . '</p>';
+        echo '<p>' . esc_html__('Before uploading any video content, you must first create a video object. A "test" video object is automatically created when the Library ID and API Key are initially saved or when they are changed, but you can manually create a new "test" video object if necessary.', 'tutor-lms-bunnynet-integration') . '</p>';
         echo '<button id="bunny-create-video-object" class="button button-secondary">' . esc_html__('Create Video Object', 'tutor-lms-bunnynet-integration') . '</button>';
 
         // Add JavaScript for the AJAX request
