@@ -7,9 +7,9 @@
  * @since 0.1.0
  */
 
-namespace WPBunnyStream\Integration;
+namespace WP_BunnyStream\Admin;
 
-use WPBunnyStream\Integration\BunnyApi;
+use WP_BunnyStream\Integration\BunnyApi;
 
 if (!defined('ABSPATH')) {
     exit; // Exit if accessed directly.

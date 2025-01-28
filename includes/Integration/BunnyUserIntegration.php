@@ -1,5 +1,5 @@
 <?php
-namespace WPBunnyStream\Integration;
+namespace WP_BunnyStream\Integration;
 
 if (!defined('ABSPATH')) {
     exit; // Exit if accessed directly.
