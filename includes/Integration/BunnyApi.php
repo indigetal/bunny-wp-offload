@@ -93,7 +93,41 @@ class BunnyApi {
         }
     
         return new \WP_Error('library_creation_failed', __('Library creation failed. Response did not include a library ID.', 'tutor-lms-bunnynet-integration'));
-    }                      
+    } 
+    
+    /**
+     * Create a new video object in Bunny.net.
+     *
+     * @param string $title The title of the video.
+     * @return array|\WP_Error The response from Bunny.net or a WP_Error on failure.
+     */
+    public function createVideoObject($title) {
+        // Ensure library_id is set in the plugin settings
+        if (empty($this->library_id)) {
+            return new \WP_Error(
+                'missing_library_id',
+                __('Library ID is not set in the plugin settings.', 'tutor-lms-bunnynet-integration')
+            );
+        }
+
+        // Ensure a title is provided
+        if (empty($title)) {
+            return new \WP_Error(
+                'missing_video_title',
+                __('Video title is required.', 'tutor-lms-bunnynet-integration')
+            );
+        }
+
+        // Define the API endpoint and data payload
+        $endpoint = "library/{$this->library_id}/videos";
+        $data = ['title' => $title];
+
+        // Debug logging for troubleshooting
+        error_log("Creating video object in Bunny.net: LibraryID={$this->library_id}, Title={$title}");
+
+        // Send request using the shared method
+        return $this->sendJsonToBunny($endpoint, 'POST', $data);
+    }
 
     /**
      * Retrieve the playback URL of a video.
