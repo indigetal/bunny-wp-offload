@@ -6,7 +6,6 @@ if (!defined('ABSPATH')) {
 }
 
 class BunnyMetadataManager {
-
     /**
      * Updates the video metadata (_video) for the specified post.
      *
@@ -26,6 +25,9 @@ class BunnyMetadataManager {
             error_log('BunnyMetadataManager: Missing required video data fields.');
             return false;
         }
+
+        // Sanitize input
+        $videoData = array_map('sanitize_text_field', $videoData);
 
         // Update metadata
         $result = update_post_meta($postId, '_video', $videoData);
@@ -58,7 +60,7 @@ class BunnyMetadataManager {
             return null;
         }
 
-        return $videoData;
+        return array_map('sanitize_text_field', $videoData);
     }
 
     /**

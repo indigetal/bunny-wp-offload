@@ -29,6 +29,22 @@ class BunnySettings {
     private $bunnyApi;
 
     /**
+     * Encrypt API key before storing it.
+     */
+    public static function encrypt_api_key($key) {
+        $encryption_key = wp_salt();
+        return base64_encode(openssl_encrypt($key, 'aes-256-cbc', $encryption_key, 0, substr($encryption_key, 0, 16)));
+    }
+
+    /**
+     * Decrypt API key when retrieving it.
+     */
+    public static function decrypt_api_key($encrypted_key) {
+        $encryption_key = wp_salt();
+        return openssl_decrypt(base64_decode($encrypted_key), 'aes-256-cbc', $encryption_key, 0, substr($encryption_key, 0, 16));
+    }
+
+    /**
      * Initialize the settings page.
      */
     public function __construct() {
@@ -40,9 +56,7 @@ class BunnySettings {
         add_action('wp_ajax_bunny_create_library', [$this, 'handleCreateLibraryAjax']);
 
         // Initialize BunnyApi instance
-        $accessKey = get_option(self::OPTION_ACCESS_KEY, '');
-        $libraryId = get_option(self::OPTION_LIBRARY_ID, '');
-        $this->bunnyApi = new BunnyApi($accessKey, $libraryId);
+        $this->bunnyApi = \BunnyApiInstance::getInstance();
 
         // Hook to check and create video object when options are updated
         add_action('update_option_' . self::OPTION_ACCESS_KEY, [$this, 'checkAndCreateVideoObject'], 10, 2);
@@ -66,8 +80,8 @@ class BunnySettings {
      * Register settings for Bunny.net credentials.
      */
     public function registerSettings() {
-        register_setting('bunny_net_settings', self::OPTION_ACCESS_KEY);
-        register_setting('bunny_net_settings', self::OPTION_LIBRARY_ID);
+        register_setting('bunny_net_settings', self::OPTION_ACCESS_KEY, ['sanitize_callback' => function($value) { return BunnySettings::encrypt_api_key($value); }]);
+        register_setting('bunny_net_settings', self::OPTION_LIBRARY_ID, ['sanitize_callback' => 'sanitize_text_field']);
 
         add_settings_section(
             'bunny_net_credentials',
@@ -107,7 +121,6 @@ class BunnySettings {
             'bunny-net-settings',
             'bunny_net_credentials'
         );
-
     }
 
     /**
@@ -129,7 +142,10 @@ class BunnySettings {
      */
     public function renderLibraryIdField() {
         $library_id = get_option(self::OPTION_LIBRARY_ID, '');
-        echo '<input type="text" id="bunny-library-id" name="bunny_library_id" value="' . esc_attr($library_id) . '" class="regular-text" readonly />';
+        echo "<input type='text' name='" . self::OPTION_LIBRARY_ID . "' value='$library_id' class='regular-text' />";
+        echo '<p class="description">';
+        echo esc_html__('When activated on a multisite network, a different library should be used for each site on the network to avoid duplicate naming conflicts of the user collections that are automatically generated.', 'wp-bunnystream');
+        echo '</p>';
     }    
 
     /**
@@ -164,9 +180,10 @@ class BunnySettings {
                     console.error(error);
                 });
             });
-
         </script>';
     }
+
+    // --- Continue in BunnySettings - Second Half ---
 
     /**
      * Render the Library Creation field.
@@ -234,41 +251,36 @@ class BunnySettings {
      * Handle AJAX request to create a video object.
      */
     public function handleManualVideoCreationAjax() {
-        error_log('handleManualVideoCreationAjax called');
+        check_ajax_referer('bunny_nonce', 'security');
 
-        $access_key = get_option(self::OPTION_ACCESS_KEY, '');
+        $title = sanitize_text_field($_POST['title'] ?? 'test');
         $library_id = get_option(self::OPTION_LIBRARY_ID, '');
-
-        $title = sanitize_text_field($_POST['title'] ?? 'test'); // Default title
-
-        error_log("Access Key: {$access_key}, Library ID: {$library_id}, Title: {$title}");
 
         if (empty($title) || empty($library_id)) {
             wp_send_json_error(['message' => __('Title or Library ID is missing.', 'wp-bunnystream')], 400);
         }
 
+        // Check if collection already exists before creating a new one
+        $existing_collection = $this->bunnyApi->getCollectionByUserId(get_current_user_id());
+        if ($existing_collection) {
+            wp_send_json_success(['message' => __('Collection already exists.', 'wp-bunnystream')]);
+        }
+
         $response = $this->bunnyApi->createVideoObject($title);
 
         if (is_wp_error($response)) {
-            error_log('Error creating video object: ' . $response->get_error_message());
             wp_send_json_error(['message' => $response->get_error_message()], 500);
         }
 
-        if (isset($response['guid'])) {
-            error_log('Video object created successfully: ' . $response['guid']);
-            wp_send_json_success([
-                'message' => __('Video object created successfully.', 'wp-bunnystream'),
-            ]);            
-        } else {
-            error_log('Failed to create video object. Response: ' . print_r($response, true));
-            wp_send_json_error(['message' => __('Failed to create video object.', 'wp-bunnystream')], 500);
-        }
-    }        
+        wp_send_json_success(['message' => __('Video object created successfully.', 'wp-bunnystream')]);
+    }
 
     /**
      * Handle AJAX request to create a library.
      */
     public function handleCreateLibraryAjax() {
+        check_ajax_referer('bunny_nonce', 'security');
+
         if (!current_user_can('manage_options')) {
             wp_send_json_error(['message' => __('Unauthorized access.', 'wp-bunnystream')], 403);
         }
@@ -279,30 +291,20 @@ class BunnySettings {
             wp_send_json_error(['message' => __('Library name is required.', 'wp-bunnystream')], 400);
         }
 
-        // Call the Bunny API to create a library
         $response = $this->bunnyApi->createLibrary($libraryName);
-
-        // Debug logging to check the API response
-        error_log('Bunny API Create Library Response: ' . print_r($response, true));
 
         if (is_wp_error($response)) {
             wp_send_json_error(['message' => $response->get_error_message()], 500);
         }
 
         if (isset($response['guid'])) {
-            // Update the Library ID option in WordPress
-            update_option(self::OPTION_LIBRARY_ID, $response['guid']);
-
-            error_log('Library ID updated in settings: ' . $response['guid']);
-
+            update_option(self::OPTION_LIBRARY_ID, BunnySettings::encrypt_api_key($response['guid']));
             wp_send_json_success([
                 'message' => __('Library created successfully.', 'wp-bunnystream'),
-                'libraryId' => $response['guid'], // Include Library ID in response
+                'libraryId' => $response['guid'],
             ]);
         } else {
-            error_log('Failed to create library. Response: ' . print_r($response, true));
-            wp_send_json_error(['message' => __('Failed to create library. Check API response.', 'wp-bunnystream')], 500);
+            wp_send_json_error(['message' => __('Failed to create library.', 'wp-bunnystream')], 500);
         }
-    }    
-
+    }
 }

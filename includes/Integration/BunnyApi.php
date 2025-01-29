@@ -3,18 +3,26 @@
 namespace WP_BunnyStream\Integration;
 
 class BunnyApi {
+    private static $instance = null;
     private $video_base_url = 'https://video.bunnycdn.com/'; // For video-related actions
     private $library_base_url = 'https://api.bunny.net/';    // For library-related actions
     private $access_key;
     private $library_id;
 
-    public function __construct($access_key, $library_id) {
-        $this->access_key = $access_key;
-        $this->library_id = $library_id;
+    private function __construct() {
+        $this->access_key = BunnySettings::decrypt_api_key(get_option('bunny_net_access_key', ''));
+        $this->library_id = BunnySettings::decrypt_api_key(get_option('bunny_net_library_id', ''));
+    }
+
+    public static function getInstance() {
+        if (self::$instance === null) {
+            self::$instance = new self();
+        }
+        return self::$instance;
     }
 
     /**
-     * Generic method to send JSON requests to Bunny.net
+     * Generic method to send JSON requests to Bunny.net with retry logic.
      */
     private function sendJsonToBunny($endpoint, $method, $data = [], $useLibraryBase = false) {
         $base_url = $useLibraryBase ? $this->library_base_url : $this->video_base_url;
@@ -44,27 +52,38 @@ class BunnyApi {
             $args['body'] = json_encode($data);
         }
 
-        // Debug logging
-        error_log('Bunny API Request: ' . print_r(compact('url', 'args'), true));
+        return $this->retryApiCall(function() use ($url, $args) {
+            $response = wp_remote_request($url, $args);
+            if (is_wp_error($response)) {
+                return $response;
+            }
+            $response_code = wp_remote_retrieve_response_code($response);
+            $response_body = wp_remote_retrieve_body($response);
 
-        // Send request
-        $response = wp_remote_request($url, $args);
+            if ($response_code < 200 || $response_code >= 300) {
+                return new \WP_Error(
+                    'bunny_api_http_error',
+                    sprintf(__('HTTP Error %d: %s (Endpoint: %s)', 'wp-bunnystream'), $response_code, $response_body, $endpoint)
+                );
+            }
+            return json_decode($response_body, true);
+        });
+    }
 
-        if (is_wp_error($response)) {
-            return $response; // Return WP_Error for error handling
+    /**
+     * Retry failed API calls with exponential backoff.
+     */
+    private function retryApiCall($callback, $maxAttempts = 3) {
+        $attempt = 0;
+        while ($attempt < $maxAttempts) {
+            $response = $callback();
+            if (!is_wp_error($response)) {
+                return $response;
+            }
+            sleep(pow(2, $attempt)); // Exponential backoff
+            $attempt++;
         }
-
-        $response_code = wp_remote_retrieve_response_code($response);
-        $response_body = wp_remote_retrieve_body($response);
-
-        if ($response_code < 200 || $response_code >= 300) {
-            return new \WP_Error(
-                'bunny_api_http_error',
-                sprintf(__('HTTP Error %d: %s (Endpoint: %s)', 'wp-bunnystream'), $response_code, $response_body, $endpoint)
-            );
-        }
-
-        return json_decode($response_body, true);
+        return new \WP_Error('api_failure', __('Bunny.net API failed after multiple attempts.', 'wp-bunnystream'));
     }
 
     /**
@@ -74,59 +93,39 @@ class BunnyApi {
         if (empty($libraryName)) {
             return new \WP_Error('missing_library_name', __('Library name is required to create a new library.', 'wp-bunnystream'));
         }
-    
-        $endpoint = 'videolibrary'; // Library management endpoint
-        $data = [
-            'name' => $libraryName,
-            'readOnly' => false,
-            'replicationRegions' => [], // Optional: Update this based on desired regions
-        ];
-    
-        $response = $this->sendJsonToBunny($endpoint, 'POST', $data, true); // Use library_base_url
-    
-        if (is_wp_error($response)) {
-            return $response;
-        }
-    
-        if (isset($response['guid'])) {
-            return $response['guid'];
-        }
-    
-        return new \WP_Error('library_creation_failed', __('Library creation failed. Response did not include a library ID.', 'wp-bunnystream'));
-    } 
-    
+
+        $endpoint = 'videolibrary';
+        $data = ['name' => $libraryName, 'readOnly' => false, 'replicationRegions' => []];
+
+        return $this->sendJsonToBunny($endpoint, 'POST', $data, true);
+    }
+
     /**
      * Create a new video object in Bunny.net.
-     *
-     * @param string $title The title of the video.
-     * @return array|\WP_Error The response from Bunny.net or a WP_Error on failure.
      */
     public function createVideoObject($title) {
-        // Ensure library_id is set in the plugin settings
         if (empty($this->library_id)) {
-            return new \WP_Error(
-                'missing_library_id',
-                __('Library ID is not set in the plugin settings.', 'wp-bunnystream')
-            );
+            return new \WP_Error('missing_library_id', __('Library ID is not set in the plugin settings.', 'wp-bunnystream'));
         }
-
-        // Ensure a title is provided
         if (empty($title)) {
-            return new \WP_Error(
-                'missing_video_title',
-                __('Video title is required.', 'wp-bunnystream')
-            );
+            return new \WP_Error('missing_video_title', __('Video title is required.', 'wp-bunnystream'));
         }
 
-        // Define the API endpoint and data payload
         $endpoint = "library/{$this->library_id}/videos";
         $data = ['title' => $title];
 
-        // Debug logging for troubleshooting
-        error_log("Creating video object in Bunny.net: LibraryID={$this->library_id}, Title={$title}");
-
-        // Send request using the shared method
         return $this->sendJsonToBunny($endpoint, 'POST', $data);
+    }
+
+    /**
+     * Validate MIME type before file upload.
+     */
+    public function validateMimeType($filePath) {
+        $mime_type = mime_content_type($filePath);
+        if (!in_array($mime_type, ['video/mp4', 'video/webm'])) {
+            return new \WP_Error('invalid_mime', __('Invalid file type.', 'wp-bunnystream'));
+        }
+        return true;
     }
 
     /**
@@ -140,72 +139,11 @@ class BunnyApi {
         return $this->sendJsonToBunny($endpoint, 'GET', []);
     }
 
-// The rest of the code is in "BunnyNet Integration Refactor" canvas
-
-    /**
-     * Check the transcoding status of a video.
-     *
-     * @param string $videoId The ID of the video.
-     * @return array|WP_Error The API response or WP_Error on failure.
-     */
-    public function getVideoStatus($videoId) {
-        $endpoint = "videos/{$videoId}/status";
-        return $this->sendJsonToBunny($endpoint, 'GET', []);
-    }
-
-    /**
-     * Check if a video has been successfully created.
-     *
-     * @param string $videoId The ID of the video.
-     * @return bool|WP_Error True if the video is created, or WP_Error on failure.
-     */
-    public function isVideoCreated($videoId) {
-        $status = $this->getVideoStatus($videoId);
-
-        if (is_wp_error($status)) {
-            return $status;
-        }
-
-        // Check if the status indicates the video is created
-        return isset($status['status']) && $status['status'] === 'Success';
-    }
-
-    /**
-     * Create a new collection within a library.
-     *
-     * @param string $collectionName The name of the collection.
-     * @param array $additionalData (Optional) Additional data for the collection, like a description.
-     * @return array|WP_Error The created collection data or WP_Error on failure.
-     */
-    public function createCollection($collectionName, $additionalData = [], $userId = null) {
-        if (empty($this->library_id)) {
-            return new \WP_Error('missing_library_id', __('Library ID is required to create a collection.', 'wp-bunnystream'));
-        }
-    
-        if (empty($collectionName)) {
-            return new \WP_Error('missing_collection_name', __('Collection name is required.', 'wp-bunnystream'));
-        }
-    
-        $endpoint = "library/{$this->library_id}/collections";
-        $data = array_merge(['name' => $collectionName], $additionalData);
-    
-        $response = $this->sendJsonToBunny($endpoint, 'POST', $data);
-    
-        if (is_wp_error($response)) {
-            return $response;
-        }
-    
-        if (isset($response['id']) && $userId) {
-            $dbManager = new \WPBunnyStream\Integration\BunnyDatabaseManager();
-            $dbManager->storeUserCollection($userId, $response['id']);
-        }
-    
-        return isset($response['id']) ? $response : new \WP_Error('collection_creation_failed', __('Failed to create collection.', 'wp-bunnystream'));
-    }
+// Continue in Bunny API Second Half
 
     /**
      * Delete a collection by its ID.
-     *
+     * 
      * @param string $collectionId The ID of the collection to delete.
      * @return bool|WP_Error True on success, or WP_Error on failure.
      */
@@ -231,11 +169,11 @@ class BunnyApi {
         }
     
         return true;
-    }    
+    }
 
     /**
      * Get details of a specific collection.
-     *
+     * 
      * @param string $collectionId The ID of the collection to retrieve.
      * @return array|WP_Error The collection details or WP_Error on failure.
      */
@@ -254,7 +192,7 @@ class BunnyApi {
 
     /**
      * Update the details of an existing collection.
-     *
+     * 
      * @param string $collectionId The ID of the collection to update.
      * @param array $data The updated data for the collection (e.g., name, metadata).
      * @return array|WP_Error The updated collection details or WP_Error on failure.
@@ -278,7 +216,7 @@ class BunnyApi {
 
     /**
      * Upload a video to Bunny.net.
-     *
+     * 
      * @param string $filePath The path to the video file on the server.
      * @param string $collectionId The collection ID to associate the video with (optional).
      * @return array|WP_Error The API response or WP_Error on failure.
@@ -292,7 +230,13 @@ class BunnyApi {
             return new \WP_Error('file_not_found', __('The video file does not exist.', 'wp-bunnystream'));
         }
     
-        // Check if collectionId is provided; if not, retrieve or create one for the user
+        // Validate MIME type
+        $mimeValidation = $this->validateMimeType($filePath);
+        if (is_wp_error($mimeValidation)) {
+            return $mimeValidation;
+        }
+    
+        // Retrieve or create collection
         if (!$collectionId && $userId) {
             $dbManager = new \WPBunnyStream\Integration\BunnyDatabaseManager();
             $collectionId = $dbManager->getUserCollectionId($userId);
@@ -309,66 +253,47 @@ class BunnyApi {
             }
         }
     
-        // Build the API endpoint
-        $endpoint = "library/{$this->library_id}/videos";
-        if ($collectionId) {
-            $endpoint .= "?collection={$collectionId}";
-        }
+        // Upload video
+        $endpoint = "library/{$this->library_id}/videos" . ($collectionId ? "?collection={$collectionId}" : "");
     
-        // Open the file for streaming
-        $fileHandle = fopen($filePath, 'r');
-        if (!$fileHandle) {
-            return new \WP_Error('file_error', __('Unable to open the video file for reading.', 'wp-bunnystream'));
-        }
+        return $this->retryApiCall(function() use ($endpoint, $filePath) {
+            $fileHandle = fopen($filePath, 'r');
+            if (!$fileHandle) {
+                return new \WP_Error('file_error', __('Unable to open the video file for reading.', 'wp-bunnystream'));
+            }
     
-        // Prepare headers
-        $headers = [
-            'AccessKey' => $this->access_key,
-            'Content-Type' => 'application/octet-stream',
-        ];
+            $headers = [
+                'AccessKey' => $this->access_key,
+                'Content-Type' => 'application/octet-stream',
+            ];
     
-        // Build request arguments
-        $args = [
-            'method' => 'POST',
-            'headers' => $headers,
-            'body' => $fileHandle,
-            'timeout' => 300,
-        ];
+            $args = [
+                'method' => 'POST',
+                'headers' => $headers,
+                'body' => $fileHandle,
+                'timeout' => 300,
+            ];
     
-        // Send request
-        $url = $this->video_base_url . ltrim($endpoint, '/');
-        error_log('Uploading video to Bunny.net: ' . $url);
-        $response = wp_remote_request($url, $args);
+            $url = $this->video_base_url . ltrim($endpoint, '/');
+            $response = wp_remote_request($url, $args);
+            fclose($fileHandle);
     
-        // Close the file handle
-        fclose($fileHandle);
+            if (is_wp_error($response)) {
+                return $response;
+            }
     
-        if (is_wp_error($response)) {
-            return $response;
-        }
+            $response_code = wp_remote_retrieve_response_code($response);
+            $response_body = wp_remote_retrieve_body($response);
     
-        $response_code = wp_remote_retrieve_response_code($response);
-        $response_body = wp_remote_retrieve_body($response);
+            if ($response_code < 200 || $response_code >= 300) {
+                return new \WP_Error(
+                    'bunny_api_http_error',
+                    sprintf(__('HTTP Error %d: %s (Endpoint: %s)', 'wp-bunnystream'), $response_code, $response_body, $endpoint)
+                );
+            }
     
-        if ($response_code < 200 || $response_code >= 300) {
-            return new \WP_Error(
-                'bunny_api_http_error',
-                sprintf(__('HTTP Error %d: %s (Endpoint: %s)', 'wp-bunnystream'), $response_code, $response_body, $endpoint)
-            );
-        }
-    
-        $videoData = json_decode($response_body, true);
-    
-        // Optional metadata update
-        if ($postId && class_exists('\WPBunnyStream\Integration\BunnyMetadataManager')) {
-            $metadataManager = new \WPBunnyStream\Integration\BunnyMetadataManager();
-            $metadataManager->updatePostVideoMetadata($postId, [
-                'video_url' => $videoData['url'] ?? '',
-                'collection_id' => $collectionId,
-            ]);
-        }
-    
-        return $videoData;
-    }        
+            return json_decode($response_body, true);
+        });
+    }     
     
 }

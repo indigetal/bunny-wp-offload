@@ -17,9 +17,23 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     const file = fileInput.files[0];
+    const allowedTypes = ["video/mp4", "video/webm"];
+    const maxFileSize = 500 * 1024 * 1024; // 500MB limit
+
+    if (!allowedTypes.includes(file.type)) {
+      alert("Invalid file type. Please upload an MP4 or WebM video.");
+      return;
+    }
+
+    if (file.size > maxFileSize) {
+      alert("File size exceeds the maximum allowed limit (500MB). Please choose a smaller file.");
+      return;
+    }
+
     const formData = new FormData();
     formData.append("action", "bunny_video_upload");
     formData.append("video", file);
+    formData.append("security", bunnyUploadVars.nonce); // Include nonce for security
 
     // Check if additional metadata like post ID or collection ID is needed
     const postId = uploadButton.dataset.postId;
@@ -57,6 +71,7 @@ document.addEventListener("DOMContentLoaded", function () {
         } else {
           statusMessage.textContent = `Error: ${data.message || "Unknown error occurred."}`;
           statusMessage.style.color = "red";
+          console.error("Upload failed:", data);
         }
       })
       .catch((error) => {

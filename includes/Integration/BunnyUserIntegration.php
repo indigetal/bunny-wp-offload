@@ -6,8 +6,12 @@ if (!defined('ABSPATH')) {
 }
 
 class BunnyUserIntegration {
+    private $bunnyApi;
 
     public function __construct() {
+        // Initialize BunnyApi instance
+        $this->bunnyApi = \BunnyApiInstance::getInstance();
+
         // Hook into user actions
         add_action('wp_bunny_video_upload', [$this, 'handleVideoUpload'], 10, 2);
         add_action('delete_user', [$this, 'handleUserDeletion']);
@@ -24,6 +28,11 @@ class BunnyUserIntegration {
         // Verify user permissions.
         if (!current_user_can('upload_files')) {
             return new \WP_Error('unauthorized_access', __('Unauthorized access.', 'wp-bunnystream'));
+        }
+
+        // Check nonce for security
+        if (!isset($request['_wpnonce']) || !wp_verify_nonce($request['_wpnonce'], 'bunny_upload_nonce')) {
+            return new \WP_Error('invalid_nonce', __('Invalid nonce.', 'wp-bunnystream'));
         }
 
         // Check for uploaded file and post ID.
@@ -52,29 +61,29 @@ class BunnyUserIntegration {
 
         if (!$collectionId) {
             // No collection exists for the user, create one.
-            $bunnyApi = $GLOBALS['bunny_net_api'];
             $collectionName = "User_Collection_{$userId}";
-            $response = $bunnyApi->createCollection($collectionName);
-
-            if (is_wp_error($response)) {
-                error_log('Failed to create collection for user ' . $userId . ': ' . $response->get_error_message());
-                return;
+            $existingCollection = $this->bunnyApi->getCollectionByUserId($userId);
+            
+            if ($existingCollection) {
+                $collectionId = $existingCollection;
+            } else {
+                $response = $this->bunnyApi->createCollection($collectionName);
+                if (is_wp_error($response)) {
+                    error_log('Failed to create collection for user ' . $userId . ': ' . $response->get_error_message());
+                    return;
+                }
+                $collectionId = $response['id'];
+                $dbManager->storeUserCollection($userId, $collectionId);
             }
-
-            $collectionId = $response['id'];
-            $dbManager->storeUserCollection($userId, $collectionId);
         }
 
-        // Use BunnyApi to upload the video
-        $bunnyApi = $GLOBALS['bunny_net_api'];
-        $uploadResponse = $bunnyApi->uploadVideo($videoPath, $collectionId);
-
+        // Upload video
+        $uploadResponse = $this->bunnyApi->uploadVideo($videoPath, $collectionId);
         if (is_wp_error($uploadResponse)) {
             error_log('Video upload failed for user ' . $userId . ': ' . $uploadResponse->get_error_message());
             return;
         }
 
-        // Log or process success
         error_log("Video uploaded by user {$userId} added to collection {$collectionId}.");
     }
 
@@ -89,15 +98,13 @@ class BunnyUserIntegration {
         $collectionId = $dbManager->getUserCollectionId($userId);
 
         if ($collectionId) {
-            $bunnyApi = $GLOBALS['bunny_net_api'];
-            $response = $bunnyApi->deleteCollection($collectionId);
-
+            $response = $this->bunnyApi->deleteCollection($collectionId);
             if (is_wp_error($response)) {
                 error_log('Failed to delete collection for user ' . $userId . ': ' . $response->get_error_message());
             } else {
                 error_log("Collection {$collectionId} for user {$userId} deleted successfully.");
             }
-
+            
             // Remove collection record from the database
             $dbManager->deleteUserCollection($userId);
         }
