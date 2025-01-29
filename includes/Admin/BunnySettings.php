@@ -45,11 +45,36 @@ class BunnySettings {
     }
 
     /**
+     * Enqueue admin scripts for Bunny.net settings.
+     */
+    public function enqueueAdminScripts($hook) {
+        if ($hook !== 'settings_page_bunny-net-settings') { // Only enqueue on settings page
+            return;
+        }
+
+        wp_enqueue_script(
+            'bunny-admin-script',
+            plugin_dir_url(__FILE__) . '../../assets/js/bunny-admin.js',
+            ['jquery'],
+            null,
+            true
+        );
+
+        wp_localize_script('bunny-admin-script', 'bunnyUploadVars', [
+            'ajaxurl' => admin_url('admin-ajax.php'),
+            'nonce'   => wp_create_nonce('bunny_nonce'),
+        ]);
+    }
+
+    /**
      * Initialize the settings page.
      */
     public function __construct() {
         add_action('admin_menu', [$this, 'addSettingsPage']);
         add_action('admin_init', [$this, 'registerSettings']);
+
+        // Enqueue admin scripts
+        add_action('admin_enqueue_scripts', [$this, 'enqueueAdminScripts']);
 
         // AJAX handlers
         add_action('wp_ajax_bunny_manual_create_video', [$this, 'handleManualVideoCreationAjax']);
@@ -62,6 +87,7 @@ class BunnySettings {
         add_action('update_option_' . self::OPTION_ACCESS_KEY, [$this, 'checkAndCreateVideoObject'], 10, 2);
         add_action('update_option_' . self::OPTION_LIBRARY_ID, [$this, 'checkAndCreateVideoObject'], 10, 2);
     }
+
 
     /**
      * Add the Bunny.net settings page to the WordPress admin menu.
@@ -154,16 +180,21 @@ class BunnySettings {
     public function renderManualVideoCreationButton() {
         echo '<p>' . esc_html__('Before uploading any video content, you must first create a video object. A "test" video object is automatically created when the Library ID and API Key are initially saved or when they are changed, but you can manually create a new "test" video object if necessary.', 'wp-bunnystream') . '</p>';
         echo '<button id="bunny-create-video-object" class="button button-secondary">' . esc_html__('Create Video Object', 'wp-bunnystream') . '</button>';
-
+    
         // Add JavaScript for the AJAX request
         echo '<script>
             document.getElementById("bunny-create-video-object").addEventListener("click", function(event) {
                 event.preventDefault();
-
+    
+                let formData = new URLSearchParams();
+                formData.append("action", "bunny_manual_create_video");
+                formData.append("title", "test");
+                formData.append("security", bunnyUploadVars.nonce); // Ensure nonce is included
+    
                 fetch(ajaxurl, {
                     method: "POST",
                     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                    body: new URLSearchParams({ action: "bunny_manual_create_video", title: "test" })
+                    body: formData
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -181,7 +212,7 @@ class BunnySettings {
                 });
             });
         </script>';
-    }
+    }    
 
     // --- Continue in BunnySettings - Second Half ---
 
@@ -214,6 +245,7 @@ class BunnySettings {
                     body: new URLSearchParams({
                         action: "bunny_create_library",
                         library_name: libraryName,
+                        security: bunnyUploadVars.nonce // Ensure nonce is included
                     }),
                 })
                     .then((response) => response.json())

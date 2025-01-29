@@ -21,8 +21,15 @@ require_once plugin_dir_path(__FILE__) . 'includes/Integration/BunnyUserIntegrat
  * Singleton class for BunnyApi instance.
  */
 class BunnyApiInstance {
+    private static $instance = null;
+
     public static function getInstance() {
-        return \WP_BunnyStream\Integration\BunnyApi::getInstance();
+        if (self::$instance === null) {
+            $access_key = get_option('bunny_net_access_key', '');
+            $library_id = get_option('bunny_net_library_id', '');
+            self::$instance = new \WP_BunnyStream\Integration\BunnyApi($access_key, $library_id);
+        }
+        return self::$instance;
     }
 }
 
@@ -50,10 +57,33 @@ function wp_bunnystream_enqueue_admin_scripts($hook) {
             true
         );
 
-        wp_localize_script('bunny-video-upload', 'bunnyVideoUpload', [
-            'ajaxurl' => admin_url('admin-ajax.php'),
-            'nonce'   => wp_create_nonce('bunny_video_upload_nonce'),
-        ]);
+        wp_localize_script('bunny-video-upload', 'bunnyUploadVars', [
+    'ajaxurl' => admin_url('admin-ajax.php'),
+    'nonce'   => wp_create_nonce('bunny_nonce'), // Match check_ajax_referer()
+]);
     }
 }
 add_action('admin_enqueue_scripts', 'wp_bunnystream_enqueue_admin_scripts');
+
+/**
+ * Enqueue frontend scripts for Bunny.net video uploads.
+ */
+function enqueue_bunny_frontend_scripts() {
+    if (is_admin()) {
+        return; // Don't load in WP Admin
+    }
+
+    wp_enqueue_script(
+        'bunny-frontend-script',
+        plugin_dir_url(__FILE__) . 'assets/js/bunny-frontend.js',
+        ['jquery'],
+        null,
+        true
+    );
+
+    wp_localize_script('bunny-frontend-script', 'bunnyUploadVars', [
+        'ajaxurl' => admin_url('admin-ajax.php'),
+        'nonce'   => wp_create_nonce('bunny_nonce'),
+    ]);
+}
+add_action('wp_enqueue_scripts', 'enqueue_bunny_frontend_scripts');

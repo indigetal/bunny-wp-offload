@@ -54,7 +54,7 @@ class BunnyApi {
             $args['body'] = json_encode($data);
         }
 
-        return $this->retryApiCall(function() use ($url, $args) {
+        return $this->retryApiCall(function() use ($url, $args, $endpoint) {
             $response = wp_remote_request($url, $args);
             if (is_wp_error($response)) {
                 return $response;
@@ -258,7 +258,8 @@ class BunnyApi {
         // Upload video
         $endpoint = "library/{$this->library_id}/videos" . ($collectionId ? "?collection={$collectionId}" : "");
     
-        return $this->retryApiCall(function() use ($endpoint, $filePath) {
+        $videoBaseUrl = $this->video_base_url;
+        return $this->retryApiCall(function() use ($endpoint, $filePath, $videoBaseUrl) {
             $fileHandle = fopen($filePath, 'r');
             if (!$fileHandle) {
                 return new \WP_Error('file_error', __('Unable to open the video file for reading.', 'wp-bunnystream'));
