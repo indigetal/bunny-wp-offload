@@ -21,15 +21,8 @@ require_once plugin_dir_path(__FILE__) . 'includes/Integration/BunnyUserIntegrat
  * Singleton class for BunnyApi instance.
  */
 class BunnyApiInstance {
-    private static $instance = null;
-
     public static function getInstance() {
-        if (self::$instance === null) {
-            $access_key = get_option('bunny_net_access_key', '');
-            $library_id = get_option('bunny_net_library_id', '');
-            self::$instance = new \WP_BunnyStream\Integration\BunnyApi($access_key, $library_id);
-        }
-        return self::$instance;
+        return \WP_BunnyStream\Integration\BunnyApi::getInstance();
     }
 }
 
