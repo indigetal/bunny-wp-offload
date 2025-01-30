@@ -40,11 +40,20 @@ class BunnyMediaLibrary {
         $collection_id = $this->databaseManager->getUserCollectionId($user_id);
         if (!$collection_id) {
             $collectionName = "User_Collection_{$user_id}";
-            $response = $this->bunnyApi->getCollection($collection_id);
-            if (is_wp_error($response) || empty($response)) {
+
+            // Check if collection already exists before creating a new one
+            $existingCollections = $this->bunnyApi->getCollections();
+            foreach ($existingCollections as $collection) {
+                if ($collection['name'] === $collectionName) {
+                    $collection_id = $collection['id'];
+                    break;
+                }
+            }
+
+            if (!$collection_id) {
                 $response = $this->bunnyApi->createCollection($collectionName);
-                if (is_wp_error($response)) {
-                    error_log('Failed to create Bunny.net collection: ' . $response->get_error_message());
+                if (is_wp_error($response) || empty($response['id'])) {
+                    error_log('Failed to create Bunny.net collection: ' . ($response->get_error_message() ?? 'Unknown error'));
                     return $upload;
                 }
                 $collection_id = $response['id'];
@@ -57,6 +66,8 @@ class BunnyMediaLibrary {
         if (is_wp_error($uploadResponse)) {
             error_log('Bunny.net Video Upload Failed: ' . $uploadResponse->get_error_message());
             return $upload;
+        } else {
+            error_log('Bunny.net Video Upload Success: ' . print_r($uploadResponse, true));
         }
 
         // Store Bunny.net metadata

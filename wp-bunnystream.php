@@ -15,6 +15,7 @@ if (!defined('ABSPATH')) {
 require_once plugin_dir_path(__FILE__) . 'includes/Admin/BunnySettings.php';
 require_once plugin_dir_path(__FILE__) . 'includes/Integration/BunnyApi.php';
 require_once plugin_dir_path(__FILE__) . 'includes/Integration/BunnyDatabaseManager.php';
+require_once plugin_dir_path(__FILE__) . 'includes/Integration/BunnyMetadataManager.php';
 require_once plugin_dir_path(__FILE__) . 'includes/Integration/BunnyUserIntegration.php';
 require_once plugin_dir_path(__FILE__) . 'includes/Integration/BunnyMediaLibrary.php';
 
@@ -43,6 +44,7 @@ function wp_bunnystream_init() {
     // Initialize settings and database management
     new \WP_BunnyStream\Admin\BunnySettings();
     new \WP_BunnyStream\Integration\BunnyDatabaseManager();
+    new \WP_BunnyStream\Integration\BunnyMetadataManager();
     new \WP_BunnyStream\Integration\BunnyUserIntegration();
     new \WP_BunnyStream\Integration\BunnyMediaLibrary();
 }
