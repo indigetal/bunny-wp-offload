@@ -50,6 +50,20 @@ class BunnyMetadataManager {
     }
 
     /**
+     * Store Bunny.net thumbnail URL for a video.
+     *
+     * @param int    $postId       The post ID of the video attachment.
+     * @param string $thumbnailUrl The URL of the Bunny.net-generated thumbnail.
+     */
+    public function storeBunnyVideoThumbnail($postId, $thumbnailUrl) {
+        if (empty($postId) || empty($thumbnailUrl)) {
+            error_log('BunnyMetadataManager: Missing post ID or thumbnail URL.');
+            return;
+        }
+        update_post_meta($postId, '_bunny_thumbnail_url', esc_url($thumbnailUrl));
+    }
+
+    /**
      * Retrieve video metadata for posts or media library items.
      *
      * @param int $id The WordPress post ID or attachment ID.
@@ -108,6 +122,21 @@ class BunnyMetadataManager {
     }
 
     /**
+     * Override wp_get_attachment_metadata to use Bunny.net thumbnails if available.
+     *
+     * @param array $metadata The existing attachment metadata.
+     * @param int   $postId   The attachment post ID.
+     * @return array The modified metadata with Bunny.net thumbnail.
+     */
+    public function filterBunnyVideoThumbnail($metadata, $postId) {
+        $bunnyThumbnailUrl = get_post_meta($postId, '_bunny_thumbnail_url', true);
+        if (!empty($bunnyThumbnailUrl)) {
+            $metadata['bunny_thumbnail'] = esc_url($bunnyThumbnailUrl);
+        }
+        return $metadata;
+    }
+
+    /**
      * Override wp_get_attachment_url to use Bunny.net video URL if available.
      *
      * @param string $url The original attachment URL.
@@ -122,3 +151,6 @@ class BunnyMetadataManager {
 
 // Apply the filter to override media library URLs
 add_filter('wp_get_attachment_url', [new BunnyMetadataManager(), 'filterBunnyVideoURL'], 10, 2);
+
+// Apply the filter to override video thumbnails in the Media Library
+add_filter('wp_get_attachment_metadata', [new BunnyMetadataManager(), 'filterBunnyVideoThumbnail'], 10, 2);
