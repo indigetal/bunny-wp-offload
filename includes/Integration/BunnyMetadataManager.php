@@ -106,4 +106,19 @@ class BunnyMetadataManager {
 
         return true;
     }
+
+    /**
+     * Override wp_get_attachment_url to use Bunny.net video URL if available.
+     *
+     * @param string $url The original attachment URL.
+     * @param int    $postId The attachment post ID.
+     * @return string The overridden Bunny.net URL if available, otherwise the original URL.
+     */
+    public function filterBunnyVideoURL($url, $postId) {
+        $bunnyVideoURL = get_post_meta($postId, '_bunny_video_url', true);
+        return !empty($bunnyVideoURL) ? esc_url($bunnyVideoURL) : $url;
+    }
 }
+
+// Apply the filter to override media library URLs
+add_filter('wp_get_attachment_url', [new BunnyMetadataManager(), 'filterBunnyVideoURL'], 10, 2);
