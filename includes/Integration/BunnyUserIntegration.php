@@ -2,6 +2,7 @@
 namespace WP_BunnyStream\Integration;
 
 use WP_BunnyStream\Integration\BunnyDatabaseManager;
+use WP_BunnyStream\Integration\BunnyMetadataManager;
 
 if (!defined('ABSPATH')) {
     exit; // Exit if accessed directly.
@@ -9,10 +10,14 @@ if (!defined('ABSPATH')) {
 
 class BunnyUserIntegration {
     private $bunnyApi;
+    private $metadataManager;
+    private $databaseManager;
 
     public function __construct() {
         // Initialize BunnyApi instance
         $this->bunnyApi = \BunnyApiInstance::getInstance();
+        $this->metadataManager = new BunnyMetadataManager();
+        $this->databaseManager = new BunnyDatabaseManager();
 
         // Hook into user actions
         add_action('wp_bunny_video_upload', [$this, 'handleVideoUpload'], 10, 2);
@@ -53,13 +58,13 @@ class BunnyUserIntegration {
     /**
      * Handle video upload by instructors.
      * Create a Bunny.net collection for the user if it does not exist.
+     * Store metadata after successful upload.
      *
      * @param int $userId The ID of the user uploading the video.
      * @param string $videoPath The path to the uploaded video.
      */
     public function handleVideoUpload($userId, $videoPath) {
-        $dbManager = new BunnyDatabaseManager();
-        $collectionId = $dbManager->getUserCollectionId($userId);
+        $collectionId = $this->databaseManager->getUserCollectionId($userId);
     
         if (!$collectionId) {
             // No collection exists for the user, create one.
@@ -72,7 +77,7 @@ class BunnyUserIntegration {
             }
     
             $collectionId = $response['id'];
-            $dbManager->storeUserCollection($userId, $collectionId);
+            $this->databaseManager->storeUserCollection($userId, $collectionId);
         }
     
         // Upload video
@@ -81,10 +86,21 @@ class BunnyUserIntegration {
             error_log('Video upload failed for user ' . $userId . ': ' . $uploadResponse->get_error_message());
             return;
         }
+
+        $videoId = $uploadResponse['videoId'];
+        $videoUrl = $uploadResponse['videoUrl'] ?? '';
+    
+        // Store Bunny.net metadata
+        $this->metadataManager->storeVideoMetadata($userId, [
+            'source' => 'bunnycdn',
+            'videoUrl' => $videoUrl,
+            'collectionId' => $collectionId,
+            'videoGuid' => $videoId,
+        ]);
     
         error_log("Video uploaded by user {$userId} added to collection {$collectionId}.");
-    }       
-
+    }
+    
     /**
      * Handle user deletion.
      * Delete the user's Bunny.net collection if it exists.
@@ -92,8 +108,7 @@ class BunnyUserIntegration {
      * @param int $userId The ID of the user being deleted.
      */
     public function handleUserDeletion($userId) {
-        $dbManager = new BunnyDatabaseManager();
-        $collectionId = $dbManager->getUserCollectionId($userId);
+        $collectionId = $this->databaseManager->getUserCollectionId($userId);
 
         if ($collectionId) {
             $response = $this->bunnyApi->deleteCollection($collectionId);
@@ -104,7 +119,7 @@ class BunnyUserIntegration {
             }
             
             // Remove collection record from the database
-            $dbManager->deleteUserCollection($userId);
+            $this->databaseManager->deleteUserCollection($userId);
         }
     }
 }
