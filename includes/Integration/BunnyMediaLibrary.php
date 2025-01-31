@@ -61,12 +61,11 @@ class BunnyMediaLibrary {
                     return $upload;
                 }
                 
-                if (!isset($response['id'])) {
-                    error_log('Failed to create Bunny.net collection: API response did not include an ID.');
+                if (!isset($response['guid'])) {
+                    error_log('Failed to create Bunny.net collection: API response did not include a GUID.');
                     return $upload;
                 }
-                
-                $collection_id = $response['id'];
+                $collection_id = $response['guid'];                
                 $this->databaseManager->storeUserCollection($user_id, $collection_id);
             }
         }
