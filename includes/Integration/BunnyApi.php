@@ -76,10 +76,22 @@ class BunnyApi {
 
             if ($response_code < 200 || $response_code >= 300) {
                 error_log("Bunny API Error: Failed Request to $endpoint");
-                error_log("Headers: " . print_r($headers, true));
-            
-                if ($method !== 'GET') { // Log request body for POST, PUT, DELETE
+
+                if (isset($headers)) {
+                    error_log("Headers: " . print_r($headers, true));
+                } else {
+                    error_log("Headers: Undefined");
+                }
+                if (isset($method)) {
+                    error_log("Method: " . $method);
+                } else {
+                    error_log("Method: Undefined");
+                }
+
+                if (isset($data)) {
                     error_log("Request Body: " . json_encode($data));
+                } else {
+                    error_log("Request Body: Undefined");
                 }
             }                                    
             return json_decode($response_body, true);
@@ -121,7 +133,12 @@ class BunnyApi {
         }
     
         // Since we know the collection name format, construct the collection ID and check if it exists
+        if (empty($userId)) {
+            return new \WP_Error('missing_user_id', __('User ID is required to create a collection.', 'wp-bunnystream'));
+        }
+
         $collectionId = "wpbs_uid_{$userId}";
+
         $existingCollection = $this->getCollection($collectionId);
     
         if (!is_wp_error($existingCollection) && isset($existingCollection['id'])) {
