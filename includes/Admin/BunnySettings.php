@@ -203,7 +203,7 @@ class BunnySettings {
             }
 
             // Create a test video object
-            $response = $api->createVideo(__('Test Video', 'wp-bunnystream'));
+            $response = $api->createVideoObject(__('Test Video', 'wp-bunnystream'));
 
             if (is_wp_error($response)) {
                 error_log('Bunny API Error: ' . $response->get_error_message());
@@ -247,26 +247,20 @@ class BunnySettings {
     /**
      * Handle AJAX request to create a video object.
      */
+    /**
+     * Handle AJAX request to create a video object.
+     */
     public function handleManualVideoCreationAjax() {
         check_ajax_referer('bunny_nonce', 'security');
 
-        $title = sanitize_text_field($_POST['title'] ?? 'test');
+        $title = isset($_POST['title']) ? sanitize_text_field($_POST['title']) : 'Test Video';
         $library_id = esc_attr(BunnySettings::decrypt_api_key(get_option(self::OPTION_LIBRARY_ID, '')));
 
         if (empty($title) || empty($library_id)) {
             wp_send_json_error(['message' => __('Title or Library ID is missing.', 'wp-bunnystream')], 400);
         }
 
-        // Check if collection already exists before creating a new one
-        $dbManager = new \WP_BunnyStream\Integration\BunnyDatabaseManager();
-        $collectionId = $dbManager->getUserCollectionId(get_current_user_id());
-        $remoteCollection = $this->bunnyApi->getCollection($collectionId);
-
-        if ($collectionId && $remoteCollection) {
-            wp_send_json_success(['message' => __('Collection already exists.', 'wp-bunnystream')]);
-        }
-
-
+        // Create a test video object without collections
         $response = $this->bunnyApi->createVideoObject($title);
 
         if (is_wp_error($response)) {

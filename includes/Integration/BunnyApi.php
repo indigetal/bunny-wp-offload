@@ -164,21 +164,30 @@ class BunnyApi {
     }                
 
     /**
-     * Create a new video object in Bunny.net.
+     * Create a video object without a collection.
      */
     public function createVideoObject($title) {
         $library_id = $this->getLibraryId();
         if (empty($library_id)) {
-            return new \WP_Error('missing_library_id', __('Library ID is not set in the plugin settings.', 'wp-bunnystream'));
-        }
-        if (empty($title)) {
-            return new \WP_Error('missing_video_title', __('Video title is required.', 'wp-bunnystream'));
+            return new \WP_Error('missing_library_id', __('Library ID is required to create a video object.', 'wp-bunnystream'));
         }
 
         $endpoint = "library/{$library_id}/videos";
         $data = ['title' => $title];
 
-        return $this->sendJsonToBunny($endpoint, 'POST', $data);
+        $response = $this->sendJsonToBunny($endpoint, 'POST', $data);
+
+        if (is_wp_error($response)) {
+            return $response;
+        }
+
+        // Enhanced error handling for missing GUID
+        if (!isset($response['guid'])) {
+            error_log('Bunny API Error: API response did not include a GUID. Response: ' . print_r($response, true));
+            return new \WP_Error('video_creation_failed', __('Failed to retrieve video GUID after creation.', 'wp-bunnystream'));
+        }
+
+        return ['guid' => $response['guid']];
     }
 
     /**

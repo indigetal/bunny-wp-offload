@@ -16,7 +16,8 @@ document.addEventListener("DOMContentLoaded", function () {
       })
         .then((response) => response.json())
         .then((data) => {
-          if (data.success) {
+          console.log("API Response:", data); // Log full response for debugging
+          if (data.success) {        
             alert("Video object created successfully!");
           } else {
             const errorMessage = data.data?.message || "An unknown error occurred.";
