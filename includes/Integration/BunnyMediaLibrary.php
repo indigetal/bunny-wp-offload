@@ -24,88 +24,125 @@ class BunnyMediaLibrary {
     }
 
     /**
-     * Intercept video uploads and offload them to Bunny.net
+     * Helper function to log messages in a structured way.
+     *
+     * @param string $message The log message.
+     * @param string $type    The type of message (info, warning, error).
      */
-    public function interceptUpload($upload, $context) {
-        if (!isset($upload['type']) || strpos($upload['type'], 'video/') !== 0) {
-            return $upload; // Not a video file, proceed normally
+    private function log( $message, $type = 'info' ) {
+        if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+            $log_entry = sprintf( '[BunnyMediaLibrary] [%s] %s', strtoupper( $type ), $message );
+            error_log( $log_entry );
+        }
+    }
+
+    /**
+     * Intercepts video uploads and, if applicable, offloads them to Bunny.net.
+     *
+     * @param array $upload Data array representing the uploaded file.
+     * @param mixed $context Additional context.
+     * @return array|WP_Error The modified upload array or WP_Error on failure.
+     */
+    public function interceptUpload( $upload, $context ) {
+        // Only process video files.
+        if ( ! isset( $upload['type'] ) || strpos( $upload['type'], 'video/' ) !== 0 ) {
+            return $upload;
+        }
+
+        if ( ! isset( $upload['post_id'] ) ) {
+            $this->log( "Missing post_id in upload array.", 'error' );
+            return new \WP_Error( 'missing_post_id', __( 'Missing post_id for video upload.', 'wp-bunnystream' ) );
+        }
+
+        // Check if the video has already been offloaded.
+        $existingVideoId = get_post_meta( $upload['post_id'], '_bunny_video_id', true );
+        if ( $existingVideoId ) {
+            $this->log( "Skipping offload; video already offloaded (ID: {$existingVideoId}).", 'info' );
+            return $upload;
         }
 
         $user_id = get_current_user_id();
-        if (!$user_id) {
-            return $upload; // User must be logged in to upload
+        if ( ! $user_id ) {
+            // If user isn't logged in, simply return the upload unmodified.
+            return $upload;
         }
 
-        if (empty($user_id)) {
-            error_log("Bunny API Error: Attempted to create a collection with an empty user ID.");
-            return new \WP_Error('missing_user_id', __('User ID is required to create a collection.', 'wp-bunnystream'));
+        // Delegate the offloading process to offloadVideo().
+        $result = $this->offloadVideo( $upload, $upload['post_id'], $user_id );
+        return is_wp_error( $result ) ? $upload : $result;
+    }
+
+    /**
+     * Offloads a video to Bunny.net with enhanced error handling and logging.
+     *
+     * @param array $upload  Data array representing the uploaded file.
+     * @param int   $post_id The attachment post ID.
+     * @param int   $user_id The ID of the user performing the upload.
+     * @return array|WP_Error The modified upload array including Bunny.net video details or WP_Error on failure.
+     */
+    public function offloadVideo( $upload, $post_id, $user_id ) {
+        // Validate file existence.
+        if ( ! isset( $upload['file'] ) || ! file_exists( $upload['file'] ) ) {
+            $this->log( 'Invalid file path provided for video offloading.', 'error' );
+            return new \WP_Error( 'invalid_file_path', __( 'The provided file path is invalid.', 'wp-bunnystream' ) );
+        }
+        $filePath = $upload['file'];
+
+        // Validate MIME type.
+        $mimeValidation = $this->bunnyApi->validateMimeType( $filePath );
+        if ( is_wp_error( $mimeValidation ) ) {
+            $this->log( 'MIME type validation failed: ' . $mimeValidation->get_error_message(), 'error' );
+            return $mimeValidation;
         }
 
-        // Check if user already has a Bunny.net collection
-        $collection_id = $this->databaseManager->getUserCollectionId($user_id);
-        if (!$collection_id) {
-            $user = get_userdata($user_id);
-            $username = $user ? sanitize_title($user->user_login) : "user_{$user_id}";
-            $collectionName = "wpbs_{$username}";
-
-            // Check if collection already exists before creating a new one
-            $existingCollection = $this->databaseManager->getCollectionByName($collectionName);
-            if ($existingCollection) {
-                // Verify that the collection actually exists on Bunny.net
-                $apiCheck = $this->bunnyApi->getCollection($existingCollection);
-                if (!is_wp_error($apiCheck)) {
-                    $collection_id = $existingCollection; // Use database value if Bunny.net confirms its existence
-                } else {
-                    error_log("Bunny API Warning: Local database references a collection that does not exist on Bunny.net. Recreating...");
-                }
-            }            
-
-            if (!$collection_id || is_wp_error($apiCheck)) {
-                $response = $this->bunnyApi->createCollection($collectionName, [], $user_id);            
-                error_log('Bunny API Collection Creation Response: ' . print_r($response, true));
-
-                if (is_wp_error($response)) {
-                    error_log('Failed to create Bunny.net collection: ' . $response->get_error_message());
-                    return $upload;
-                }
-
-                if (!isset($response['guid'])) {
-                    error_log('Failed to create Bunny.net collection: API response did not include a GUID.');
-                    return $upload;
-                }
-
-                $collection_id = $response['guid'];
-                $this->databaseManager->storeUserCollection($user_id, $collection_id);
+        // Determine the user's collection.
+        $user = get_userdata( $user_id );
+        if ( ! $user ) {
+            $this->log( 'Could not retrieve user data for user ID ' . $user_id, 'error' );
+            return new \WP_Error( 'invalid_user', __( 'Invalid user specified.', 'wp-bunnystream' ) );
+        }
+        $collectionName = sanitize_title( $user->user_login );
+        $collectionId   = $this->databaseManager->getUserCollectionId( $user_id );
+        if ( ! $collectionId ) {
+            // Create a new collection if it doesn't exist.
+            $collectionId = $this->bunnyApi->createCollection( $collectionName, [], $user_id );
+            if ( is_wp_error( $collectionId ) ) {
+                $this->log( 'Failed to create collection: ' . $collectionId->get_error_message(), 'error' );
+                return $collectionId;
             }
         }
 
-        error_log("Bunny API Debug: Preparing to upload video file: " . $filePath);
-
-        // Upload video to Bunny.net
-        $uploadResponse = $this->bunnyApi->uploadVideo($upload['file'], $collection_id);
-        if (is_wp_error($uploadResponse)) {
-            error_log('Bunny.net Video Upload Failed: ' . $uploadResponse->get_error_message());
-            return $upload;
-        } else {
-            error_log('Bunny.net Video Upload Success: ' . print_r($uploadResponse, true));
+        // Offload the video file using BunnyApi.
+        $uploadResponse = $this->bunnyApi->uploadVideo( $filePath, $collectionId, $post_id, $user_id );
+        if ( is_wp_error( $uploadResponse ) ) {
+            $this->log( 'Video upload failed: ' . $uploadResponse->get_error_message(), 'error' );
+            return $uploadResponse;
         }
 
-        // Store Bunny.net metadata
-        $bunny_video_id = $uploadResponse['videoId'];
-        $bunny_video_url = $uploadResponse['videoUrl'] ?? '';
+        // Validate API response.
+        if ( ! is_array( $uploadResponse ) || ! isset( $uploadResponse['videoId'] ) || empty( $uploadResponse['videoUrl'] ) ) {
+            $this->log( 'Invalid API response received: ' . json_encode( $uploadResponse ), 'error' );
+            return new \WP_Error( 'invalid_api_response', __( 'Bunny.net did not return a valid videoId or videoUrl.', 'wp-bunnystream' ) );
+        }
 
-        // Store metadata using the updated method
-        $this->metadataManager->storeVideoMetadata($upload['post_id'], [
-            'source' => 'bunnycdn',
-            'videoUrl' => $bunny_video_url,
-            'collectionId' => $collection_id,
-            'videoGuid' => $bunny_video_id,
-        ]);
+        // Optionally, delete the local file.
+        if ( file_exists( $filePath ) ) {
+            @unlink( $filePath );
+        }
 
-        $upload['url'] = $bunny_video_url; // Replace WordPress URL with Bunny.net URL
-        $upload['file'] = ''; // Prevent local file storage
-        $upload['bunny_video_id'] = $bunny_video_id;
-        
+        // Update the upload data with Bunny.net details.
+        $upload['bunny_video_url'] = $uploadResponse['videoUrl'];
+        $upload['video_id']        = $uploadResponse['videoId'];
+
+        // Store metadata for later reference.
+        $this->metadataManager->storeVideoMetadata( $post_id, [
+            'source'      => 'bunnycdn',
+            'videoUrl'    => $uploadResponse['videoUrl'],
+            'collectionId'=> $collectionId,
+            'videoGuid'   => $uploadResponse['videoId'],
+        ] );
+
+        $this->log( 'Video offloaded successfully. Video ID: ' . $uploadResponse['videoId'], 'info' );
         return $upload;
     }
 

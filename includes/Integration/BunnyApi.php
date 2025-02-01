@@ -13,6 +13,16 @@ class BunnyApi {
 
     const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB limit
 
+    /**
+     * Helper function to log messages in a structured way.
+     */
+    private function log($message, $type = 'info') {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            $log_entry = sprintf('[BunnyAPI] [%s] %s', strtoupper($type), $message);
+            error_log($log_entry);
+        }
+    }
+
     private function __construct() {
         $this->access_key = BunnySettings::decrypt_api_key(get_option('bunny_net_access_key', ''));
         $this->library_id = BunnySettings::decrypt_api_key(get_option('bunny_net_library_id', ''));
@@ -29,9 +39,9 @@ class BunnyApi {
         if (empty($this->library_id)) {
             $this->library_id = BunnySettings::decrypt_api_key(get_option('bunny_net_library_id', ''));
             if (empty($this->library_id)) {
-                error_log('Bunny API Warning: Library ID is missing or not set.');
+                $this->log('Library ID is missing or not set.', 'warning');
             }
-        }
+        }        
         return $this->library_id;
     }    
 
@@ -75,18 +85,16 @@ class BunnyApi {
             $response_body = wp_remote_retrieve_body($response);
 
             if ($response_code < 200 || $response_code >= 300) {
-                error_log("Bunny API Error: Failed Request to $endpoint");
-
-                error_log("Headers: " . (!empty($args['headers']) ? print_r($args['headers'], true) : 'Undefined'));
-                error_log("Method: " . (!empty($args['method']) ? $args['method'] : 'Undefined'));
-
-                if (isset($args['body'])) {
-                    error_log("Request Body: " . json_encode($args['body']));
-                } else {
-                    error_log("Request Body: Undefined");
+                $this->log("Failed Request to $endpoint (HTTP $response_code)", 'error');
+                $this->log("Headers: " . json_encode($args['headers']), 'debug');
+                $this->log("Method: " . $args['method'], 'debug');
+            
+                if (!empty($args['body'])) {
+                    $this->log("Request Body: " . json_encode($args['body']), 'debug');
                 }
-
-            }                                    
+            
+                return new \WP_Error('bunny_api_http_error', sprintf(__('Bunny.net API Error (HTTP %d): %s', 'wp-bunnystream'), $response_code, $response_body));
+            }                                                
             return json_decode($response_body, true);
         });
     }
@@ -97,15 +105,21 @@ class BunnyApi {
     private function retryApiCall($callback, $maxAttempts = 3) {
         $attempt = 0;
         while ($attempt < $maxAttempts) {
+            $this->log("API Attempt #" . ($attempt + 1), 'info');
+            
             $response = $callback();
             if (!is_wp_error($response)) {
                 return $response;
             }
-            sleep(pow(2, $attempt)); // Exponential backoff
+    
+            $this->log("API Call Failed. Retrying in " . (2 ** $attempt) . " seconds...", 'warning');
+            sleep(2 ** $attempt); // Progressive delay
+    
             $attempt++;
         }
+    
         return new \WP_Error('api_failure', __('Bunny.net API failed after multiple attempts.', 'wp-bunnystream'));
-    }    
+    }        
 
     /**
      * Create a new collection within a library.
@@ -117,9 +131,12 @@ class BunnyApi {
      */
     public function createCollection($collectionName, $additionalData = [], $userId = null) {
         $library_id = $this->getLibraryId();
-        if (empty($library_id)) {
-            return new \WP_Error('missing_library_id', __('Library ID is required to create a collection.', 'wp-bunnystream'));
-        }
+        if (empty($this->library_id)) {
+            $this->library_id = BunnySettings::decrypt_api_key(get_option('bunny_net_library_id', ''));
+            if (empty($this->library_id)) {
+                $this->log('Library ID is missing or not set.', 'warning');
+            }
+        }        
     
         if (empty($collectionName)) {
             return new \WP_Error('missing_collection_name', __('Collection name is required.', 'wp-bunnystream'));
@@ -135,7 +152,7 @@ class BunnyApi {
             if (!is_wp_error($apiCheck)) {
                 return $existingCollection; // Collection exists on Bunny, return it
             }
-            error_log("Bunny API Warning: Local database references a collection that does not exist on Bunny.net. Recreating...");
+            $this->log("Local database references a collection that does not exist on Bunny.net. Recreating...", 'warning');
         }
     
         // Step 2: Collection does not exist in the database, create it on Bunny.net
@@ -168,9 +185,12 @@ class BunnyApi {
      */
     public function createVideoObject($title) {
         $library_id = $this->getLibraryId();
-        if (empty($library_id)) {
-            return new \WP_Error('missing_library_id', __('Library ID is required to create a video object.', 'wp-bunnystream'));
-        }
+        if (empty($this->library_id)) {
+            $this->library_id = BunnySettings::decrypt_api_key(get_option('bunny_net_library_id', ''));
+            if (empty($this->library_id)) {
+                $this->log('Library ID is missing or not set.', 'warning');
+            }
+        }        
 
         $endpoint = "library/{$library_id}/videos";
         $data = ['title' => $title];
@@ -209,9 +229,12 @@ class BunnyApi {
      */
     public function getVideoPlaybackUrl($videoId) {
         $library_id = $this->getLibraryId();
-        if (empty($library_id)) {
-            return new \WP_Error('missing_library_id', __('Library ID is required to fetch playback URL.', 'wp-bunnystream'));
-        }
+        if (empty($this->library_id)) {
+            $this->library_id = BunnySettings::decrypt_api_key(get_option('bunny_net_library_id', ''));
+            if (empty($this->library_id)) {
+                $this->log('Library ID is missing or not set.', 'warning');
+            }
+        }        
     
         $endpoint = "library/{$library_id}/videos/{$videoId}";
         return $this->sendJsonToBunny($endpoint, 'GET');
@@ -225,9 +248,12 @@ class BunnyApi {
      */
     public function deleteCollection($collectionId, $userId = null) {
         $library_id = $this->getLibraryId();
-        if (empty($library_id)) {
-            return new \WP_Error('missing_library_id', __('Library ID is required to delete a collection.', 'wp-bunnystream'));
-        }
+        if (empty($this->library_id)) {
+            $this->library_id = BunnySettings::decrypt_api_key(get_option('bunny_net_library_id', ''));
+            if (empty($this->library_id)) {
+                $this->log('Library ID is missing or not set.', 'warning');
+            }
+        }        
 
         if (empty($collectionId)) {
             return new \WP_Error('missing_collection_id', __('Collection ID is required.', 'wp-bunnystream'));
@@ -256,9 +282,12 @@ class BunnyApi {
      */
     public function getCollection($collectionId) {
         $library_id = $this->getLibraryId();
-        if (empty($library_id)) {
-            return new \WP_Error('missing_library_id', __('Library ID is required to fetch a collection.', 'wp-bunnystream'));
-        }
+        if (empty($this->library_id)) {
+            $this->library_id = BunnySettings::decrypt_api_key(get_option('bunny_net_library_id', ''));
+            if (empty($this->library_id)) {
+                $this->log('Library ID is missing or not set.', 'warning');
+            }
+        }        
 
         if (empty($collectionId)) {
             return new \WP_Error('missing_collection_id', __('Collection ID is required.', 'wp-bunnystream'));
@@ -277,9 +306,12 @@ class BunnyApi {
      */
     public function updateCollection($collectionId, $data) {
         $library_id = $this->getLibraryId();
-        if (empty($library_id)) {
-            return new \WP_Error('missing_library_id', __('Library ID is required to update a collection.', 'wp-bunnystream'));
-        }
+        if (empty($this->library_id)) {
+            $this->library_id = BunnySettings::decrypt_api_key(get_option('bunny_net_library_id', ''));
+            if (empty($this->library_id)) {
+                $this->log('Library ID is missing or not set.', 'warning');
+            }
+        }        
 
         if (empty($collectionId)) {
             return new \WP_Error('missing_collection_id', __('Collection ID is required.', 'wp-bunnystream'));
@@ -302,9 +334,12 @@ class BunnyApi {
      */
     public function uploadVideo($filePath, $collectionId = null, $postId = null, $userId = null) {
         $library_id = $this->getLibraryId();
-        if (empty($library_id)) {
-            return new \WP_Error('missing_library_id', __('Library ID is required to upload a video.', 'wp-bunnystream'));
-        }
+        if (empty($this->library_id)) {
+            $this->library_id = BunnySettings::decrypt_api_key(get_option('bunny_net_library_id', ''));
+            if (empty($this->library_id)) {
+                $this->log('Library ID is missing or not set.', 'warning');
+            }
+        }        
     
         if (!is_string($filePath) || !file_exists($filePath)) {
             return new \WP_Error('invalid_file_path', __('Invalid file path for video upload.', 'wp-bunnystream'));
@@ -325,9 +360,10 @@ class BunnyApi {
         $uploadEndpoint = "library/{$library_id}/videos/{$videoId}";
     
         $uploadResponse = $this->retryApiCall(function() use ($uploadEndpoint, $filePath) {
+            $mime_type = mime_content_type($filePath);
             $headers = [
                 'AccessKey' => $this->access_key,
-                'Content-Type' => 'application/octet-stream',
+                'Content-Type' => in_array($mime_type, ['video/mp4', 'video/webm']) ? $mime_type : 'application/octet-stream',
             ];
     
             $args = [
@@ -358,8 +394,14 @@ class BunnyApi {
         });
     
         if (is_wp_error($uploadResponse)) {
+            $this->log('Bunny.net Video Upload Failed: ' . $uploadResponse->get_error_message(), 'error');
             return new \WP_Error('upload_failed', __('Failed to upload video to Bunny.net.', 'wp-bunnystream'));
         }
+        
+        if (!is_array($uploadResponse) || !isset($uploadResponse['videoId']) || empty($uploadResponse['videoUrl'])) {
+            $this->log('Invalid API response: ' . json_encode($uploadResponse), 'error');
+            return new \WP_Error('invalid_api_response', __('Bunny.net did not return a valid videoId or videoUrl.', 'wp-bunnystream'));
+        }                        
     
         // Step 3: Retrieve playback URL
         $playbackResponse = $this->getVideoPlaybackUrl($videoId);
@@ -382,9 +424,12 @@ class BunnyApi {
      */
     public function setThumbnail($videoId, $timestamp = null) {
         $library_id = $this->getLibraryId();
-        if (empty($library_id)) {
-            return new \WP_Error('missing_library_id', __('Library ID is required to set a thumbnail.', 'wp-bunnystream'));
-        }
+        if (empty($this->library_id)) {
+            $this->library_id = BunnySettings::decrypt_api_key(get_option('bunny_net_library_id', ''));
+            if (empty($this->library_id)) {
+                $this->log('Library ID is missing or not set.', 'warning');
+            }
+        }        
 
         if (empty($videoId)) {
             return new \WP_Error('missing_video_id', __('Video ID is required to set a thumbnail.', 'wp-bunnystream'));
