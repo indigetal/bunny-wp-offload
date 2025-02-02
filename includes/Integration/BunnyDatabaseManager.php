@@ -94,24 +94,23 @@ class BunnyDatabaseManager {
     /**
      * Retrieve the collection ID associated with a user.
      */
-    public function getUserCollectionId($userId, $networkWide = false) {
+    public function getUserCollectionId($userId) {
         global $wpdb;
+        $table_name = $wpdb->prefix . 'bunny_collections';
     
-        $table_name = $networkWide && is_multisite()
-            ? $wpdb->base_prefix . 'bunny_collections'
-            : $wpdb->prefix . 'bunny_collections';
-    
-        $collection_id = $wpdb->get_var($wpdb->prepare(
+        $collectionId = $wpdb->get_var($wpdb->prepare(
             "SELECT collection_id FROM $table_name WHERE user_id = %d LIMIT 1",
             $userId
         ));
     
-        if (!$collection_id) {
+        if (!$collectionId) {
             error_log("BunnyDatabaseManager: No collection found for user ID {$userId}.");
+        } else {
+            error_log("BunnyDatabaseManager: Found collection ID {$collectionId} for user ID {$userId}.");
         }
     
-        return $collection_id ?: null;
-    }    
+        return $collectionId ?: null;
+    }        
 
     /**
      * Store a user-to-collection association.
