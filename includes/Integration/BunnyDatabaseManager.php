@@ -122,7 +122,7 @@ class BunnyDatabaseManager {
             ? $wpdb->base_prefix . 'bunny_collections'
             : $wpdb->prefix . 'bunny_collections';
     
-        $existingCollection = $this->getUserCollectionId($userId, $networkWide);
+            $existingCollection = $this->getUserCollectionId($userId, $networkWide);
     
         if ($existingCollection) {
             // Update the collection instead of ignoring the new one
@@ -133,6 +133,7 @@ class BunnyDatabaseManager {
                 ['%s', '%s'],
                 ['%d']
             );
+            error_log("BunnyDatabaseManager: Updated collection ID for user ID {$userId} to {$collectionId}.");
         } else {
             // If no collection exists, insert a new record
             $wpdb->insert(
@@ -144,6 +145,7 @@ class BunnyDatabaseManager {
                 ],
                 ['%d', '%s', '%s']
             );
+            error_log("BunnyDatabaseManager: Stored new collection ID {$collectionId} for user ID {$userId}.");
         }
     }    
 
@@ -176,10 +178,17 @@ class BunnyDatabaseManager {
             ? $wpdb->base_prefix . 'bunny_collections'
             : $wpdb->prefix . 'bunny_collections';
 
-        $wpdb->delete(
+        $deleted = $wpdb->delete(
             $table_name,
             ['user_id' => $userId],
             ['%d']
         );
+
+        if ($deleted) {
+            error_log("BunnyDatabaseManager: Deleted collection record for user ID {$userId}.");
+        } else {
+            error_log("BunnyDatabaseManager: No collection found to delete for user ID {$userId}.");
+        }
     }
+
 }
