@@ -421,33 +421,33 @@ class BunnyApi {
         // Step 1: Ensure a valid collection ID exists before uploading
         if (!$collectionId && $userId) {
             $collectionId = get_user_meta($userId, '_bunny_collection_id', true);
-
+    
             if ($collectionId) {
                 // Validate if the collection exists on Bunny.net
                 $collectionCheck = $this->getCollection($collectionId);
-
+    
                 if ($collectionCheck === null || is_wp_error($collectionCheck)) {
                     $this->log("Stored collection ID {$collectionId} not found on Bunny.net. Removing and creating a new one.", 'error');
-
+    
                     // Step 1: Remove stale collection from user meta
                     delete_user_meta($userId, '_bunny_collection_id');
                     $collectionId = null; // Reset collectionId for re-creation
-
+    
                     // Step 2: Create a new collection
                     $collectionId = $this->createCollection($userId, [], $userId);
-
+    
                     // Step 3: Validate new collection creation
                     if (!$collectionId || is_wp_error($collectionId)) {
                         return new \WP_Error('collection_creation_failed', __('Collection creation failed, video upload aborted.', 'wp-bunnystream'));
                     }
-
+    
                     // Step 4: Store new collection ID
                     update_user_meta($userId, '_bunny_collection_id', $collectionId);
                 }
             }
         }
     
-        // Step 2: Create a new video object
+        // Step 2: Create a new video object in the collection
         $videoObjectResponse = $this->createVideoObject(basename($filePath), $collectionId);
     
         if (is_wp_error($videoObjectResponse) || empty($videoObjectResponse['guid'])) {
@@ -456,7 +456,7 @@ class BunnyApi {
     
         $videoId = $videoObjectResponse['guid'];
     
-        // Step 3: Upload the video file using a PUT request
+        // Step 3: Upload the actual video file to Bunny.net using PUT request
         $uploadEndpoint = "library/{$library_id}/videos/{$videoId}";
         $uploadResponse = $this->retryApiCall(function() use ($uploadEndpoint, $filePath) {
             $headers = [
@@ -464,25 +464,25 @@ class BunnyApi {
                 'Content-Type' => 'application/octet-stream',
             ];
             return wp_remote_request($uploadEndpoint, [
-                'method' => 'PUT',
-                'headers' => $headers,
-                'body' => file_get_contents($filePath),
-                'timeout' => 300,
+                'method'    => 'PUT',
+                'headers'   => $headers,
+                'body'      => file_get_contents($filePath),
+                'timeout'   => 300,
             ]);
         });
     
         if (is_wp_error($uploadResponse)) {
-            return new \WP_Error('upload_failed', __('Failed to upload video to Bunny.net.', 'wp-bunnystream'));
+            return new \WP_Error('video_upload_failed', __('Failed to upload video file to Bunny.net.', 'wp-bunnystream'));
         }
     
         // Step 4: Fetch video metadata to get playback URL
         $videoMetadata = $this->getVideoPlaybackUrl($videoId);
         if (is_wp_error($videoMetadata) || empty($videoMetadata['playbackUrl'])) {
             $this->log("Failed to retrieve playback URL for video ID: {$videoId}. Scheduling retry...", 'warning');
-
+    
             // Schedule a retry event for fetching the playback URL
             wp_schedule_single_event(time() + 60, 'wpbs_retry_fetch_video_url', [$videoId, $postId]);
-
+    
             return new \WP_Error('playback_url_failed', __('Playback URL not available yet. Retry scheduled in 60 seconds.', 'wp-bunnystream'));
         }
     
@@ -490,7 +490,7 @@ class BunnyApi {
             'videoId' => $videoId,
             'videoUrl' => $videoMetadata['playbackUrl'],
         ];
-    }                              
+    }                                
     
     /**
      * Set a thumbnail for a video in Bunny.net.

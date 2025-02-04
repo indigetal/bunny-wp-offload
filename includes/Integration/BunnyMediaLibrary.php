@@ -139,55 +139,59 @@ class BunnyMediaLibrary {
     /**
      * Store Bunny.net metadata when an attachment is added
      */
-    public function handleAttachmentMetadata( $post_id ) {
+    public function handleAttachmentMetadata($post_id) {
         // Check if this attachment is a video.
-        $mime = get_post_mime_type( $post_id );
-        if ( strpos( $mime, 'video/' ) !== 0 ) {
+        $mime = get_post_mime_type($post_id);
+        if (strpos($mime, 'video/') !== 0) {
             return;
         }
     
+        // Prevent duplicate uploads using a transient lock
+        $lock_key = "wpbs_video_upload_lock_{$post_id}";
+        if (get_transient($lock_key)) {
+            $this->log("handleAttachmentMetadata: Upload for post ID {$post_id} is already in progress.", 'warning');
+            return;
+        }
+        set_transient($lock_key, true, 60); // Lock expires after 60 seconds
+    
         // If offloading has already been done, skip.
-        $bunny_video_id = get_post_meta( $post_id, '_bunny_video_id', true );
-        if ( ! empty( $bunny_video_id ) ) {
-            $this->log( "handleAttachmentMetadata: Video already offloaded (ID: {$bunny_video_id}).", 'info' );
+        $bunny_video_id = get_post_meta($post_id, '_bunny_video_id', true);
+        if (!empty($bunny_video_id)) {
+            $this->log("handleAttachmentMetadata: Video already offloaded (ID: {$bunny_video_id}).", 'info');
             return;
         }
     
         // Retrieve the file path.
-        $filePath = get_attached_file( $post_id );
-        if ( ! $filePath || ! file_exists( $filePath ) ) {
-            $this->log( "handleAttachmentMetadata: Invalid file path for post ID {$post_id}.", 'error' );
+        $filePath = get_attached_file($post_id);
+        if (!$filePath || !file_exists($filePath)) {
+            $this->log("handleAttachmentMetadata: Invalid file path for post ID {$post_id}.", 'error');
             return;
         }
     
         // Get the user ID from the attachment post.
-        $user_id = (int) get_post_field( 'post_author', $post_id );
-        if ( ! $user_id ) {
-            $this->log( "handleAttachmentMetadata: No user found for post ID {$post_id}.", 'error' );
+        $user_id = (int) get_post_field('post_author', $post_id);
+        if (!$user_id) {
+            $this->log("handleAttachmentMetadata: No user found for post ID {$post_id}.", 'error');
             return;
         }
     
         // Build a minimal upload array for offloadVideo().
-        $upload_data = [
-            'file' => $filePath,
-            // You can add additional info if needed.
-        ];
+        $upload_data = ['file' => $filePath];
     
         // Call offloadVideo() to offload the video.
-        $result = $this->offloadVideo( $upload_data, $post_id, $user_id );
-        if ( is_wp_error( $result ) ) {
-            $this->log( "handleAttachmentMetadata: Offloading failed for post ID {$post_id}: " . $result->get_error_message(), 'error' );
+        $result = $this->offloadVideo($upload_data, $post_id, $user_id);
+        if (is_wp_error($result)) {
+            $this->log("handleAttachmentMetadata: Offloading failed for post ID {$post_id}: " . $result->get_error_message(), 'error');
             return;
         }
     
         // Optionally, update the attachment's URL and metadata.
-        if ( isset( $result['bunny_video_url'] ) ) {
-            // Update the attachment URL or add meta data.
-            update_post_meta( $post_id, '_bunny_video_url', $result['bunny_video_url'] );
-            update_post_meta( $post_id, '_bunny_video_id', $result['video_id'] );
-            $this->log( "handleAttachmentMetadata: Offloading succeeded for post ID {$post_id}.", 'info' );
+        if (isset($result['bunny_video_url'])) {
+            update_post_meta($post_id, '_bunny_video_url', $result['bunny_video_url']);
+            update_post_meta($post_id, '_bunny_video_id', $result['video_id']);
+            $this->log("handleAttachmentMetadata: Offloading succeeded for post ID {$post_id}.", 'info');
         }
-    }    
+    }        
 }
 
 // Initialize the media library integration
