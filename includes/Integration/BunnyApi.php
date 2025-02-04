@@ -188,15 +188,18 @@ class BunnyApi {
      * @param int|null $userId (Optional) The user ID for associating the collection in the database.
      * @return array|WP_Error The created collection data or WP_Error on failure.
      */
-    public function createCollection($collectionName, $additionalData = [], $userId = null) {
+    public function createCollection($userId, $additionalData = []) {
         $library_id = $this->getLibraryId();
         if (empty($library_id)) {
             return new \WP_Error('missing_library_id', __('Library ID is required to create a collection.', 'wp-bunnystream'));
         }
     
-        if (empty($collectionName)) {
-            return new \WP_Error('missing_collection_name', __('Collection name is required.', 'wp-bunnystream'));
+        if (empty($userId)) {
+            return new \WP_Error('missing_user_id', __('User ID is required to create a collection.', 'wp-bunnystream'));
         }
+    
+        // Ensure the collection name follows our naming convention
+        $collectionName = "wpbs_{$userId}";
     
         // Step 1: Prevent duplicate collection creation using a transient lock
         $lock_key = "wpbs_collection_lock_{$userId}";
@@ -218,7 +221,7 @@ class BunnyApi {
             }
         }
     
-        // Step 3: Create the collection on Bunny.net
+        // Step 3: Create the collection on Bunny.net with the correct JSON format
         $endpoint = "library/{$library_id}/collections";
         $data = array_merge(['name' => $collectionName], $additionalData);
         
@@ -232,7 +235,7 @@ class BunnyApi {
         }
     
         return $response['guid']; // Always return only the GUID
-    }                                            
+    }                                                
 
     /**
      * Create a video object
