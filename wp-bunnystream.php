@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Bunny Stream
  * Description: Offload and stream videos from Bunny's Stream Service via WordPress Media Library.
- * Version: 0.1.0
+ * Version: 1.0
  * Author: Brandon Meyer
  * Text Domain: wp-bunnystream
  */

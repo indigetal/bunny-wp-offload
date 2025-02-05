@@ -463,7 +463,7 @@ class BunnyApi {
         $this->log("uploadVideo: Bunny.net Response - " . print_r($responseBody, true), 'debug');
 
         // Step 4: Construct the playback URL
-        $playbackUrl = "https://iframe.mediadelivery.net/embed/{$library_id}/{$videoId}";
+        $playbackUrl = "https://iframe.mediadelivery.net/play/{$library_id}/{$videoId}";
 
         // Store playback URL in post meta
         if ($postId) {
