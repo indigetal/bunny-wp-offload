@@ -120,9 +120,7 @@ class BunnyApi {
             // Check if a transient exists for rate-limiting
             $retry_after_time = get_transient('bunny_api_retry_after');
             if ($retry_after_time && time() < $retry_after_time) {
-                $wait_time = $retry_after_time - time();
-                $this->log("Rate limited. Waiting {$wait_time} seconds before retrying...", 'warning');
-                sleep($wait_time);
+                sleep($retry_after_time - time());
             }
     
             $response = $callback();
@@ -234,8 +232,7 @@ class BunnyApi {
         if (is_wp_error($response) || empty($response['guid'])) {
             return new \WP_Error('collection_creation_failed', __('Failed to create collection on Bunny.net.', 'wp-bunnystream'));
         }
-    
-        return $response['guid']; // Always return only the GUID
+        return $response['guid'];        
     }                                                
 
     /**
@@ -263,17 +260,11 @@ class BunnyApi {
             $response = json_decode($response, true);
         }
 
-        if (is_wp_error($response) || !is_array($response) || empty($response['guid'])) {
-            return new \WP_Error('video_creation_failed', __('Failed to create video object.', 'wp-bunnystream'));
-        }
-
-        return $response;
-    
         if (is_wp_error($response) || empty($response['guid'])) {
             return new \WP_Error('video_creation_failed', __('Failed to create video object.', 'wp-bunnystream'));
         }
-    
-        return $response['guid']; // Return video ID
+        
+        return $response['guid'];        
     }            
 
     /**
@@ -285,89 +276,7 @@ class BunnyApi {
             return new \WP_Error('invalid_mime', __('Invalid file type.', 'wp-bunnystream'));
         }
         return true;
-    }
-
-    /**
-     * Retrieve the playback URL of a video.
-     *
-     * @param string $videoId The ID of the video.
-     * @return array|WP_Error The API response or WP_Error on failure.
-     */
-    public function getVideoPlaybackUrl($videoId, $retryCount = 0) {
-        $library_id = $this->getLibraryId();
-        if (empty($library_id)) {
-            $this->log('Library ID is missing or not set.', 'warning');
-            return new \WP_Error('missing_library_id', __('Library ID is required to retrieve video playback URL.', 'wp-bunnystream'));
-        }
-    
-        $endpoint = "library/{$library_id}/videos/{$videoId}";
-        $response = $this->sendJsonToBunny($endpoint, 'GET');
-    
-        if (is_wp_error($response)) {
-            return $response;
-        }
-    
-        // Log the full response
-        $this->log("getVideoPlaybackUrl: Bunny.net Response - " . print_r($response, true), 'debug');
-    
-        // Check encoding status
-        if (!isset($response['status'])) {
-            return new \WP_Error('missing_status', __('Video status not found in response.', 'wp-bunnystream'));
-        }
-    
-        if ($response['status'] !== 3) { // Not finished processing
-            if ($retryCount < 10) { // Limit retries to avoid infinite loop
-                $waitTime = min(30 * ($retryCount + 1), 300); // Increase wait time exponentially
-                $this->log("Video ID {$videoId} is still processing (status: {$response['status']}). Retrying in {$waitTime} seconds.", 'warning');
-                
-                // Schedule a retry
-                wp_schedule_single_event(time() + $waitTime, 'wpbs_retry_fetch_video_url', [$videoId, $retryCount + 1]);
-                return new \WP_Error('playback_url_not_ready', __('Playback URL is not yet available. Retrying...', 'wp-bunnystream'));
-            } else {
-                return new \WP_Error('max_retries_exceeded', __('Maximum retries reached. Video may still be processing.', 'wp-bunnystream'));
-            }
-        }
-    
-        if (!isset($response['playbackUrl']) || empty($response['playbackUrl'])) {
-            $this->log("getVideoPlaybackUrl: Video encoding completed but playback URL is missing. Retrying...", 'warning');
-            wp_schedule_single_event(time() + 60, 'wpbs_retry_fetch_video_url', [$videoId, $retryCount + 1]);
-            return new \WP_Error('playback_url_missing', __('Playback URL not found in response.', 'wp-bunnystream'));
-        }
-        
-        return $response;
-        
-    }        
-    
-    /**
-     * Async retry handler for fetching video playback URL.
-     */
-    public function retryFetchVideoPlaybackUrl($videoId, $postId, $retryCount = 0) {
-        $this->log("Retrying playback URL fetch for video ID: {$videoId}, Retry Count: {$retryCount}", 'info');
-    
-        $videoMetadata = $this->getVideoPlaybackUrl($videoId);
-    
-        if (is_wp_error($videoMetadata)) {
-            // If video is still processing, schedule another retry
-            if ($videoMetadata->get_error_code() === 'playback_url_not_ready' && $retryCount < 10) {
-                $waitTime = min(30 * ($retryCount + 1), 300); // Increase wait time with max of 5 minutes
-                $this->log("Playback URL not ready. Scheduling retry in {$waitTime} seconds.", 'warning');
-    
-                wp_schedule_single_event(time() + $waitTime, 'wpbs_retry_fetch_video_url', [$videoId, $postId, $retryCount + 1]);
-                return;
-            }
-    
-            $this->log("Final attempt failed to retrieve playback URL. No further retries.", 'error');
-            return;
-        }
-    
-        // ✅ Successfully retrieved playback URL, store it in post meta
-        if (!empty($videoMetadata['playbackUrl'])) {
-            $this->log("Successfully retrieved playback URL. Storing in post meta for post ID: {$postId}", 'info');
-            update_post_meta($postId, '_bunny_video_url', $videoMetadata['playbackUrl']);
-        } else {
-            $this->log("Unexpected error: Playback URL missing even after processing.", 'error');
-        }
-    }    
+    }          
 
     /**
      * Delete a collection by its ID.
@@ -481,111 +390,84 @@ class BunnyApi {
         // Step 1: Ensure a valid collection ID exists before uploading
         if (!$collectionId && $userId) {
             $collectionId = get_user_meta($userId, '_bunny_collection_id', true);
-    
-            if ($collectionId) {
-                // Validate if the collection exists on Bunny.net
-                $collectionCheck = $this->getCollection($collectionId);
-    
-                if ($collectionCheck === null || is_wp_error($collectionCheck)) {
-                    $this->log("Stored collection ID {$collectionId} not found on Bunny.net. Removing and creating a new one.", 'error');
-    
-                    // Remove stale collection from user meta
-                    delete_user_meta($userId, '_bunny_collection_id');
-                    $collectionId = null; // Reset collectionId for re-creation
-    
-                    // Create a new collection
-                    $collectionId = $this->createCollection($userId, [], $userId);
-    
-                    // Validate new collection creation
-                    if (!$collectionId || is_wp_error($collectionId)) {
-                        return new \WP_Error('collection_creation_failed', __('Collection creation failed, video upload aborted.', 'wp-bunnystream'));
-                    }
-    
-                    // Store new collection ID
-                    update_user_meta($userId, '_bunny_collection_id', $collectionId);
-                }
-            }
         }
     
-        // Step 2: Create a new video object in the collection
+        // Step 2: Create a new video object
         $videoObjectResponse = $this->createVideoObject(basename($filePath), $collectionId);
-
-        $this->log("uploadVideo: Video Object Response: " . print_r($videoObjectResponse, true), 'debug');
-
-        if (!is_array($videoObjectResponse) || !isset($videoObjectResponse['guid']) || empty($videoObjectResponse['guid'])) {
-            $this->log("uploadVideo: Invalid video object response. Full response: " . print_r($videoObjectResponse, true), 'error');
-            return new \WP_Error('video_creation_failed', __('Failed to create video object.', 'wp-bunnystream'));
-        }        
-    
-        if (is_wp_error($videoObjectResponse) || empty($videoObjectResponse['guid'])) {
+        if (is_wp_error($videoObjectResponse)) {
             return new \WP_Error('video_creation_failed', __('Failed to create video object.', 'wp-bunnystream'));
         }
     
         $videoId = $videoObjectResponse['guid'];
-        $this->log("uploadVideo: Preparing to upload file {$filePath} to Bunny.net with video ID {$videoId}.", 'debug');
+        $this->log("uploadVideo: Created video ID {$videoId}. Uploading file to Bunny.net.", 'debug');
     
-        // Step 3: Upload the video file using a PUT request
-        if (empty($library_id) || empty($videoId)) {
-            $this->log("uploadVideo: ERROR - Missing Library ID or Video ID. Library ID: {$library_id}, Video ID: {$videoId}", 'error');
-            return new \WP_Error('missing_video_data', __('Missing library ID or video ID.', 'wp-bunnystream'));
-        }
-        
+        // Step 3: Upload the video file
         $uploadEndpoint = "library/{$library_id}/videos/{$videoId}";
-        
-        $videoData = file_get_contents($filePath); // Read file into a string
-        if ($videoData === false || strlen($videoData) === 0) {
-            $this->log("uploadVideo: Failed to read video file for {$filePath}.", 'error');
-            return new \WP_Error('video_file_read_failed', __('Failed to read the video file before uploading.', 'wp-bunnystream'));
-        }
-
-        $uploadResponse = $this->retryApiCall(function() use ($uploadEndpoint, $videoData, $library_id, $videoId) {
-            $headers = [
-                'AccessKey' => $this->access_key,
-                'Accept' => 'application/json',
-                'Content-Type' => 'application/octet-stream'
-            ];
-        
-            $this->log("uploadVideo: Sending API request to Bunny.net. Endpoint: library/{$library_id}/videos/{$videoId}", 'debug');
-        
+        $videoData = file_get_contents($filePath);
+    
+        $uploadResponse = $this->retryApiCall(function() use ($uploadEndpoint, $videoData) {
             return wp_remote_request($this->video_base_url . $uploadEndpoint, [
                 'method'    => 'PUT',
-                'headers'   => $headers,
+                'headers'   => [
+                    'AccessKey'    => $this->access_key,
+                    'Accept'       => 'application/json',
+                    'Content-Type' => 'application/octet-stream'
+                ],
                 'body'      => $videoData,
                 'timeout'   => 300,
             ]);
-        });        
-
+        });
+    
         if (is_wp_error($uploadResponse)) {
-            $this->log("uploadVideo: File upload failed for {$filePath}. Error: " . $uploadResponse->get_error_message(), 'error');
             return new \WP_Error('video_upload_failed', __('Failed to upload video file to Bunny.net.', 'wp-bunnystream'));
         }
-        
-        // Log the full response from Bunny.net
-        $responseBody = wp_remote_retrieve_body($uploadResponse);
-        $this->log("uploadVideo: Bunny.net Response - " . print_r($responseBody, true), 'debug');        
     
-        // Step 4: Fetch video metadata to get playback URL
-        sleep(5); // Wait 5 seconds before checking playback URL
-        $videoMetadata = $this->getVideoPlaybackUrl($videoId);
+        // Step 4: Check Video Processing Status
+        $processingCheck = function() use ($library_id, $videoId) {
+            $endpoint = "library/{$library_id}/videos/{$videoId}";
+            $response = $this->sendJsonToBunny($endpoint, 'GET');
+        
+            if (is_wp_error($response)) {
+                return $response;
+            }
+        
+            if (!isset($response['status'])) {
+                $this->log("Processing status could not be retrieved for Video ID {$videoId}.", 'warning');
+                return null; // Ensure null is returned explicitly
+            }
+        
+            return $response['status'];
+        };                
+    
+        // Step 5: Retry if Not Processed Yet
+        $retryCount = 0;
+        while ($retryCount < 10) {
+            $status = $processingCheck();
+            if ($status === 3) {
+                break; // Video is fully processed
+            }
 
-        if (is_wp_error($videoMetadata) || empty($videoMetadata['playbackUrl'])) {
-            $this->log("Failed to retrieve playback URL for video ID: {$videoId}. Scheduling retry...", 'warning');
-
-            // Schedule a retry event for fetching the playback URL
-            wp_schedule_single_event(time() + 60, 'wpbs_retry_fetch_video_url', [$videoId, $postId]);
-
-            return new \WP_Error('playback_url_failed', __('Playback URL not available yet. Retry scheduled in 60 seconds.', 'wp-bunnystream'));
+            $this->log("Video ID {$videoId} is still processing (status: {$status}). Retrying in 30 seconds.", 'warning');
+            sleep(30); // Wait before retrying
+            $retryCount++;
         }
-
-        // ✅ Store playback URL in post meta
-        $this->log("uploadVideo: Storing playback URL in post meta for post ID: {$postId}", 'info');
-        update_post_meta($postId, '_bunny_video_url', $videoMetadata['playbackUrl']);
-
+    
+        if ($status !== 3) {
+            return new \WP_Error('processing_timeout', __('Video processing is taking too long.', 'wp-bunnystream'));
+        }
+    
+        // Step 6: Generate and Store Playback URL
+        $playbackUrl = "https://iframe.mediadelivery.net/embed/{$library_id}/{$videoId}";
+        if ($postId) {
+            update_post_meta($postId, '_bunny_video_url', $playbackUrl);
+        }        
+        $this->log("uploadVideo: Successfully stored playback URL: {$playbackUrl}", 'info');
+    
         return [
-            'videoId' => $videoId,
-            'videoUrl' => $videoMetadata['playbackUrl'],
+            'videoId'   => $videoId,
+            'videoUrl'  => $playbackUrl,
         ];
-    }                               
+    }                                   
     
     /**
      * Set a thumbnail for a video in Bunny.net.
