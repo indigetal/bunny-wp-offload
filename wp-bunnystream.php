@@ -50,22 +50,6 @@ add_action('plugins_loaded', 'wp_bunnystream_init');
  * Enqueue admin scripts for Bunny.net integration.
  */
 function wp_bunnystream_enqueue_admin_scripts($hook) {
-    // Load admin scripts on the Bunny Stream settings page
-    if ('settings_page_bunny-net-settings' === $hook) {
-        wp_enqueue_script(
-            'bunny-admin-script',
-            plugin_dir_url(__FILE__) . 'assets/js/bunny-admin.js',
-            ['jquery'],
-            null,
-            true
-        );
-
-        wp_localize_script('bunny-admin-script', 'bunnyAdminVars', [
-            'ajaxurl' => admin_url('admin-ajax.php'),
-            'nonce'   => wp_create_nonce('bunny_nonce'),
-        ]);
-    }
-
     // Load video upload scripts for Media Library & post editor pages
     if (in_array($hook, ['upload.php', 'post.php', 'post-new.php'])) {
         wp_enqueue_script(

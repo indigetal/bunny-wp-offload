@@ -89,15 +89,8 @@ class BunnySettings {
         // Enqueue admin scripts
         add_action('admin_enqueue_scripts', [$this, 'enqueueAdminScripts']);
 
-        // AJAX handlers
-        add_action('wp_ajax_bunny_manual_create_video', [$this, 'handleManualVideoCreationAjax']);
-
         // Initialize BunnyApi instance
         $this->bunnyApi = \BunnyApiInstance::getInstance();
-
-        // Hook to check and create video object when options are updated
-        add_action('update_option_' . self::OPTION_ACCESS_KEY, [$this, 'checkAndCreateVideoObject'], 10, 2);
-        add_action('update_option_' . self::OPTION_LIBRARY_ID, [$this, 'checkAndCreateVideoObject'], 10, 2);
     }
 
 
@@ -158,14 +151,6 @@ class BunnySettings {
             'bunny-net-settings',
             'bunny_net_credentials'
         );
-
-        add_settings_field(
-            'bunny_manual_video_creation',
-            __('Manual Video Creation', 'wp-bunnystream'),
-            [$this, 'renderManualVideoCreationButton'],
-            'bunny-net-settings',
-            'bunny_net_credentials'
-        );
     }
 
     /**
@@ -202,95 +187,33 @@ class BunnySettings {
         echo '<p class="description">';
         echo __('You can locate your Pull Zone at <strong>Stream > Your Library > API > Manage</strong>. Please include the full hostname.', 'wp-bunnystream');
         echo '</p>';
-    }
-
-    /**
-     * Check and create a video object if Access Key or Library ID changes.
-     *
-     * @param mixed $old_value The old option value.
-     * @param mixed $value The new option value.
-     */
-    public function checkAndCreateVideoObject($old_value, $value) {
-        $access_key = BunnySettings::decrypt_api_key(get_option(self::OPTION_ACCESS_KEY, ''));
-        $library_id = BunnySettings::decrypt_api_key(get_option(self::OPTION_LIBRARY_ID, ''));
-
-
-        if (!empty($access_key) && !empty($library_id)) {
-            // Use the BunnyApi singleton instance
-            $api = \WP_BunnyStream\Integration\BunnyApi::getInstance();
-
-            // Validate API connection before creating a test video
-            if (!$api || empty($api->library_id)) {
-                error_log('Bunny API Error: Invalid or missing Library ID.');
-                return;
-            }
-
-            // Create a test video object
-            $response = $api->createVideoObject(__('Test Video', 'wp-bunnystream'));
-
-            if (is_wp_error($response)) {
-                error_log('Bunny API Error: ' . $response->get_error_message());
-                set_transient('bunny_net_video_created', false, 60);
-                return;
-            }
-
-            if (isset($response['guid'])) {
-                error_log('Bunny API Success: Video object created with GUID ' . $response['guid']);
-                set_transient('bunny_net_video_created', true, 60);
-            } else {
-                error_log('Bunny API Error: ' . json_encode($response));
-                set_transient('bunny_net_video_created', false, 60);
-            }
-        } else {
-            error_log('Bunny API Error: Missing Access Key or Library ID.');
-        }
-    }
-
-    /**
-     * Render the Manual Video Creation button.
-     */
-    public function renderManualVideoCreationButton() {
-        echo '<p>' . esc_html__('Before uploading any video content, you must first create a video object. A "test" video object is automatically created when the Library ID and API Key are initially saved or when they are changed, but you can manually create a new "test" video object if necessary.', 'wp-bunnystream') . '</p>';
-        echo '<button id="bunny-create-video-object" class="button button-secondary">' . esc_html__('Create Video Object', 'wp-bunnystream') . '</button>';
-    }   
-
-    // --- Continue in BunnySettings - Second Half ---
+    } 
 
     /**
      * Render the settings page.
      */
     public function renderSettingsPage() {
+        echo '<div class="wrap">';
+        echo '<h1>' . esc_html__('Bunny.net Settings', 'wp-bunnystream') . '</h1>';
+
+        // Display instructions for adding the Secret Key to wp-config.php
+        echo '<div style="background: #f4f4f4; padding: 15px; border-left: 5px solid #007cba; margin-bottom: 20px;">';
+        echo '<p><strong>' . esc_html__('Important:', 'wp-bunnystream') . '</strong> ';
+        echo esc_html__('To securely store your Bunny.net API credentials, you must add a secret key to your site’s wp-config.php file.', 'wp-bunnystream');
+        echo '</p>';
+        echo '<pre style="background: #eaeaea; padding: 8px; border-radius: 4px; font-family:monospace;">';
+        echo esc_html("define('BUNNY_SECRET_KEY', 'your-secret-key');");
+        echo '</pre>';
+        echo '<p>' . esc_html__('Choose a strong, unique key. Do not change this key after saving credentials, or decryption will fail.', 'wp-bunnystream') . '</p>';
+        echo '</div>';
+
+        // Render the settings form
         echo "<form action='options.php' method='post'>";
         settings_fields('bunny_net_settings');
         do_settings_sections('bunny-net-settings');
         submit_button(__('Save Settings', 'wp-bunnystream'));
         echo "</form>";
-    }
-
-    /**
-     * Handle AJAX request to create a video object.
-     */
-    /**
-     * Handle AJAX request to create a video object.
-     */
-    public function handleManualVideoCreationAjax() {
-        check_ajax_referer('bunny_nonce', 'security');
-
-        $title = isset($_POST['title']) ? sanitize_text_field($_POST['title']) : 'Test Video';
-        $library_id = esc_attr(BunnySettings::decrypt_api_key(get_option(self::OPTION_LIBRARY_ID, '')));
-
-        if (empty($title) || empty($library_id)) {
-            wp_send_json_error(['message' => __('Title or Library ID is missing.', 'wp-bunnystream')], 400);
-        }
-
-        // Create a test video object without collections
-        $response = $this->bunnyApi->createVideoObject($title);
-
-        if (is_wp_error($response)) {
-            wp_send_json_error(['message' => $response->get_error_message()], 500);
-        }
-
-        wp_send_json_success(['message' => __('Video object created successfully.', 'wp-bunnystream')]);
+        echo '</div>';
     }
 
 }
