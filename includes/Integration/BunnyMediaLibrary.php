@@ -202,7 +202,34 @@ class BunnyMediaLibrary {
             update_post_meta($post_id, '_bunny_video_id', $result['video_id']);
             $this->log("handleAttachmentMetadata: Offloading succeeded for post ID {$post_id}.", 'info');
         }
-    }        
+    }   
+    
+    /**
+     * Override wp_get_attachment_metadata to use Bunny.net thumbnails if available.
+     *
+     * @param array $metadata The existing attachment metadata.
+     * @param int   $postId   The attachment post ID.
+     * @return array The modified metadata with Bunny.net thumbnail.
+     */
+    public function filterBunnyVideoThumbnail($metadata, $postId) {
+        $bunnyThumbnailUrl = get_post_meta($postId, '_bunny_thumbnail_url', true);
+        if (!empty($bunnyThumbnailUrl)) {
+            $metadata['bunny_thumbnail'] = esc_url($bunnyThumbnailUrl);
+        }
+        return $metadata;
+    }
+
+    /**
+     * Override wp_get_attachment_url to use Bunny.net video URL if available.
+     *
+     * @param string $url The original attachment URL.
+     * @param int    $postId The attachment post ID.
+     * @return string The overridden Bunny.net URL if available, otherwise the original URL.
+     */
+    public function filterBunnyVideoURL($url, $postId) {
+        $bunnyVideoURL = get_post_meta($postId, '_bunny_video_url', true);
+        return !empty($bunnyVideoURL) ? esc_url($bunnyVideoURL) : $url;
+    }
 }
 
 // Initialize the media library integration

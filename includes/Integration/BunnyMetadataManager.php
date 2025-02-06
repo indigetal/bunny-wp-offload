@@ -55,12 +55,6 @@ class BunnyMetadataManager {
         // Store video metadata in `_video` meta key (excluding videoUrl & thumbnailUrl)
         unset($videoData['videoUrl'], $videoData['thumbnailUrl']);
         update_post_meta($id, '_video', $videoData);
-        
-        // Store playback URL separately
-        if (!empty($videoData['videoId'])) {
-            $playbackUrl = "https://iframe.mediadelivery.net/play/" . get_option('bunny_library_id') . "/" . $videoData['videoId'];
-            update_post_meta($id, '_bunny_video_url', esc_url($playbackUrl));
-        }
 
         return true;
     }
@@ -91,36 +85,4 @@ class BunnyMetadataManager {
         return array_map('sanitize_text_field', $videoData);
     }
 
-    /**
-     * Override wp_get_attachment_metadata to use Bunny.net thumbnails if available.
-     *
-     * @param array $metadata The existing attachment metadata.
-     * @param int   $postId   The attachment post ID.
-     * @return array The modified metadata with Bunny.net thumbnail.
-     */
-    public function filterBunnyVideoThumbnail($metadata, $postId) {
-        $bunnyThumbnailUrl = get_post_meta($postId, '_bunny_thumbnail_url', true);
-        if (!empty($bunnyThumbnailUrl)) {
-            $metadata['bunny_thumbnail'] = esc_url($bunnyThumbnailUrl);
-        }
-        return $metadata;
-    }
-
-    /**
-     * Override wp_get_attachment_url to use Bunny.net video URL if available.
-     *
-     * @param string $url The original attachment URL.
-     * @param int    $postId The attachment post ID.
-     * @return string The overridden Bunny.net URL if available, otherwise the original URL.
-     */
-    public function filterBunnyVideoURL($url, $postId) {
-        $bunnyVideoURL = get_post_meta($postId, '_bunny_video_url', true);
-        return !empty($bunnyVideoURL) ? esc_url($bunnyVideoURL) : $url;
-    }
 }
-
-// Apply the filter to override media library URLs
-add_filter('wp_get_attachment_url', [new BunnyMetadataManager(), 'filterBunnyVideoURL'], 10, 2);
-
-// Apply the filter to override video thumbnails in the Media Library
-add_filter('wp_get_attachment_metadata', [new BunnyMetadataManager(), 'filterBunnyVideoThumbnail'], 10, 2);
