@@ -9,7 +9,7 @@
 
 namespace WP_BunnyStream\Admin;
 
-use WP_BunnyStream\API\BunnyApi;
+use WP_BunnyStream\API\BunnyApiClient;
 use WP_BunnyStream\API\BunnyApiKeyManager;
 
 if (!defined('ABSPATH')) {
@@ -26,9 +26,9 @@ class BunnySettings {
     const OPTION_PULL_ZONE = 'bunny_net_pull_zone';
 
     /**
-     * BunnyApi instance.
+     * BunnyApiClient instance.
      */
-    private $bunnyApi;
+    private $bunnyApiClient;
 
     private static function getEncryptionKey() {
         if (!defined('BUNNY_SECRET_KEY')) {
@@ -36,47 +36,6 @@ class BunnySettings {
             return hash('sha256', get_site_url()); // Fallback but not recommended for production
         }
         return BUNNY_SECRET_KEY;
-    }        
-    
-    /**
-     * Encrypt API key before storing it.
-     */
-    public static function encrypt_api_key($key) {
-        return base64_encode(openssl_encrypt($key, 'aes-256-cbc', self::getEncryptionKey(), 0, substr(self::getEncryptionKey(), 0, 16)));
-    }
-    
-    /**
-     * Decrypt API key when retrieving it.
-     */
-    public static function decrypt_api_key($encrypted_key) {
-        $decrypted = openssl_decrypt(base64_decode($encrypted_key), 'aes-256-cbc', self::getEncryptionKey(), 0, substr(self::getEncryptionKey(), 0, 16));
-        if ($decrypted === false) {
-            error_log('Bunny API Decryption Error: Unable to decrypt stored key.');
-            return false; // Prevents silent errors
-        }        
-        return $decrypted;
-    }    
-
-    /**
-     * Enqueue admin scripts for Bunny.net settings.
-     */
-    public function enqueueAdminScripts($hook) {
-        if ($hook !== 'settings_page_bunny-net-settings') { // Only enqueue on settings page
-            return;
-        }
-
-        wp_enqueue_script(
-            'bunny-admin-script',
-            plugin_dir_url(__FILE__) . '../../assets/js/bunny-admin.js',
-            ['jquery'],
-            null,
-            true
-        );
-
-        wp_localize_script('bunny-admin-script', 'bunnyUploadVars', [
-            'ajaxurl' => admin_url('admin-ajax.php'),
-            'nonce'   => wp_create_nonce('bunny_nonce'),
-        ]);
     }
 
     /**
@@ -86,11 +45,8 @@ class BunnySettings {
         add_action('admin_menu', [$this, 'addSettingsPage']);
         add_action('admin_init', [$this, 'registerSettings']);
 
-        // Enqueue admin scripts
-        add_action('admin_enqueue_scripts', [$this, 'enqueueAdminScripts']);
-
-        // Initialize BunnyApi instance
-        $this->bunnyApi = \BunnyApiInstance::getInstance();
+        // Initialize BunnyApiClient instance
+        $this->bunnyApiClient = BunnyApiClient::getInstance();
     }
 
 
@@ -112,10 +68,10 @@ class BunnySettings {
      */
     public function registerSettings() {
         register_setting('bunny_net_settings', self::OPTION_ACCESS_KEY, [
-            'sanitize_callback' => function($value) { return BunnySettings::encrypt_api_key($value); }
+            'sanitize_callback' => function($value) { return BunnyApiKeyManager::encrypt_api_key($value); }
         ]);
         register_setting('bunny_net_settings', self::OPTION_LIBRARY_ID, [
-            'sanitize_callback' => function($value) { return BunnySettings::encrypt_api_key($value); }
+            'sanitize_callback' => function($value) { return BunnyApiKeyManager::encrypt_api_key($value); }
         ]);
         register_setting('bunny_net_settings', self::OPTION_PULL_ZONE, [
             'sanitize_callback' => 'sanitize_text_field'
@@ -157,7 +113,7 @@ class BunnySettings {
      * Render the Access Key field.
      */
     public function renderAccessKeyField() {
-        $value = esc_attr(BunnySettings::decrypt_api_key(get_option(self::OPTION_ACCESS_KEY, '')));
+        $value = esc_attr(BunnyApiKeyManager::decrypt_api_key(get_option(self::OPTION_ACCESS_KEY, '')));
         echo "<input type='text' name='" . self::OPTION_ACCESS_KEY . "' value='$value' class='regular-text' />";
         echo '<p class="description">';
         echo sprintf(
@@ -171,7 +127,7 @@ class BunnySettings {
      * Render the Library ID field.
      */
     public function renderLibraryIdField() {
-        $library_id = esc_attr(BunnySettings::decrypt_api_key(get_option(self::OPTION_LIBRARY_ID, '')));
+        $library_id = esc_attr(BunnyApiKeyManager::decrypt_api_key(get_option(self::OPTION_LIBRARY_ID, '')));
         echo "<input type='text' name='" . self::OPTION_LIBRARY_ID . "' value='$library_id' class='regular-text' />";
         echo '<p class="description">';
         echo esc_html__('When activated on a multisite network, a different library should be used for each site on the network to avoid duplicate naming conflicts of the user collections that are automatically generated.', 'wp-bunnystream');

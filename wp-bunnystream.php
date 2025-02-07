@@ -12,28 +12,20 @@ if (!defined('ABSPATH')) {
 }
 
 // Include required files
+require_once plugin_dir_path(__FILE__) . 'includes/Utils/Constants.php';
 require_once plugin_dir_path(__FILE__) . 'includes/Admin/BunnySettings.php';
-require_once plugin_dir_path(__FILE__) . 'includes/API/BunnyApi.php';
+require_once plugin_dir_path(__FILE__) . 'includes/API/BunnyApiClient.php';
 require_once plugin_dir_path(__FILE__) . 'includes/API/BunnyApiKeyManager.php';
+require_once plugin_dir_path(__FILE__) . 'includes/API/BunnyCollectionHandler.php';
+require_once plugin_dir_path(__FILE__) . 'includes/API/BunnyVideoHandler.php';
 require_once plugin_dir_path(__FILE__) . 'includes/Integration/BunnyMetadataManager.php';
 require_once plugin_dir_path(__FILE__) . 'includes/Integration/BunnyUserIntegration.php';
 require_once plugin_dir_path(__FILE__) . 'includes/Integration/BunnyMediaLibrary.php';
 require_once plugin_dir_path(__FILE__) . 'includes/Utils/BunnyLogger.php';
 require_once plugin_dir_path(__FILE__) . 'includes/Blocks/BunnyStreamBlock.php';
 
-/**
- * Singleton class for BunnyApi instance.
- */
-class BunnyApiInstance {
-    private static $instance = null;
-
-    public static function getInstance() {
-        if (self::$instance === null) {
-            self::$instance = \WP_BunnyStream\API\BunnyApi::getInstance();
-        }
-        return self::$instance;
-    }
-}
+// Import the Constants class
+use WP_BunnyStream\Utils\Constants;
 
 /**
  * Initialize the plugin.
@@ -62,13 +54,10 @@ function wp_bunnystream_enqueue_admin_scripts($hook) {
             true
         );
 
-        // Ensure BunnyApi is initialized
-        $bunny_api = WP_BunnyStream\API\BunnyApi::getInstance();
-
         wp_localize_script('bunny-video-upload', 'bunnyUploadVars', [
-            'ajaxurl'     => admin_url('admin-ajax.php'),
+            'ajaxUrl'     => admin_url('admin-ajax.php'),
             'nonce'       => wp_create_nonce('bunny_nonce'),
-            'maxFileSize' => WP_BunnyStream\API\BunnyApi::MAX_FILE_SIZE,
+            'maxFileSize' => Constants::MAX_FILE_SIZE,
         ]);
     }
 }
@@ -94,13 +83,10 @@ function enqueue_bunny_frontend_scripts() {
         true
     );
 
-    // Ensure BunnyApi is initialized
-    $bunny_api = WP_BunnyStream\API\BunnyApi::getInstance();
-
     wp_localize_script('bunny-video-upload', 'bunnyUploadVars', [
         'ajaxurl'     => admin_url('admin-ajax.php'),
         'nonce'       => wp_create_nonce('bunny_nonce'),
-        'maxFileSize' => WP_BunnyStream\API\BunnyApi::MAX_FILE_SIZE,
+        'maxFileSize' => Constants::MAX_FILE_SIZE,
     ]);
 }
 add_action('wp_enqueue_scripts', 'enqueue_bunny_frontend_scripts');
@@ -109,5 +95,5 @@ add_action('wp_enqueue_scripts', 'enqueue_bunny_frontend_scripts');
  * Register scheduled event for retrying playback URL retrieval.
  */
 add_action('wpbs_retry_fetch_video_url', function($videoId, $postId) {
-    BunnyApiInstance::getInstance()->retryFetchVideoPlaybackUrl($videoId, $postId);
+    \WP_BunnyStream\API\BunnyApiClient::getInstance()->retryFetchVideoPlaybackUrl($videoId, $postId);
 }, 10, 2);

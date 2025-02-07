@@ -1,6 +1,8 @@
 <?php
 namespace WP_BunnyStream\Integration;
 
+use WP_BunnyStream\Utils\BunnyLogger;
+
 if (!defined('ABSPATH')) {
     exit; // Exit if accessed directly.
 }
@@ -15,7 +17,7 @@ class BunnyMetadataManager {
      */
     public function storeBunnyVideoThumbnail($postId, $videoId, $thumbnailUrl) {
         if (empty($postId) || empty($videoId) || empty($thumbnailUrl)) {
-            error_log('BunnyMetadataManager: Missing post ID, video ID, or thumbnail URL.');
+            BunnyLogger::log('BunnyMetadataManager: Missing post ID, video ID, or thumbnail URL.');
             return;
         }
 
@@ -30,34 +32,20 @@ class BunnyMetadataManager {
      * @param array $videoData The video metadata including source, URL, collection ID, GUID, and local path.
      * @return bool True if metadata updated successfully, false otherwise.
      */
-    public function storeVideoMetadata($id, $videoData) {
-        if (empty($id) || empty($videoData)) {
-            error_log('BunnyMetadataManager: Invalid parameters for storeVideoMetadata.');
-            return false;
+    public static function storeVideoMetadata($postId, $metadata) {
+        if (!is_numeric($postId) || empty($metadata) || !is_array($metadata)) {
+            BunnyLogger::log("storeVideoMetadata: Invalid input parameters.", 'error');
+            return;
         }
-
-        // Ensure ID is either a post or an attachment
-        $postType = get_post_type($id);
-        if ($postType !== 'post' && $postType !== 'attachment') {
-            error_log("BunnyMetadataManager: Invalid post type ({$postType}) for ID {$id}.");
-            return false;
+    
+        foreach ($metadata as $key => $value) {
+            if (!empty($key) && isset($value)) {
+                update_post_meta($postId, '_bunny_' . sanitize_key($key), sanitize_text_field($value));
+            }
         }
-
-        // Validate required keys
-        if (!isset($videoData['source']) || !isset($videoData['videoId'])) {
-            error_log('BunnyMetadataManager: Missing video source or video ID.');
-            return false;
-        }
-
-        // Sanitize input
-        $videoData = array_map('sanitize_text_field', $videoData);
-        
-        // Store video metadata in `_video` meta key (excluding videoUrl & thumbnailUrl)
-        unset($videoData['videoUrl'], $videoData['thumbnailUrl']);
-        update_post_meta($id, '_video', $videoData);
-
-        return true;
-    }
+    
+        BunnyLogger::log("storeVideoMetadata: Metadata successfully stored for post ID {$postId}.", 'info');
+    }    
 
     /**
      * Retrieve video metadata for posts or media library items.
@@ -67,14 +55,14 @@ class BunnyMetadataManager {
      */
     public function getVideoMetadata($id) {
         if (empty($id)) {
-            error_log('BunnyMetadataManager: Invalid ID for getVideoMetadata.');
+            BunnyLogger::log('BunnyMetadataManager: Invalid ID for getVideoMetadata.');
             return null;
         }
 
         // Ensure ID is either a post or an attachment
         $postType = get_post_type($id);
         if ($postType !== 'post' && $postType !== 'attachment') {
-            error_log("BunnyMetadataManager: Invalid post type ({$postType}) for ID {$id}.");
+            BunnyLogger::log("BunnyMetadataManager: Invalid post type ({$postType}) for ID {$id}.");
             return null;
         }
 

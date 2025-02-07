@@ -2,22 +2,20 @@
 namespace WP_BunnyStream\Integration;
 
 use WP_BunnyStream\API\BunnyApiKeyManager;
-use WP_BunnyStream\Integration\BunnyMetadataManager;
+use WP_BunnyStream\API\BunnyApiClient;
+use WP_BunnyStream\API\BunnyCollectionHandler;
 
 if (!defined('ABSPATH')) {
     exit; // Exit if accessed directly.
 }
 
 class BunnyUserIntegration {
-    private $bunnyApi;
-    private $metadataManager;
-    private $databaseManager;
+    private $bunnyApiClient;
 
     public function __construct() {
         // Initialize BunnyApi instance
-        $this->bunnyApi = \BunnyApiInstance::getInstance();
-        $this->metadataManager = new BunnyMetadataManager();
-        $this->databaseManager = new BunnyApiKeyManager();
+        $this->bunnyApiClient = BunnyApiClient::getInstance();
+        $this->collectionHandler = BunnyCollectionHandler::getInstance();
 
         // Hook into user actions
         add_action('delete_user', [$this, 'handleUserDeletion']);
@@ -64,14 +62,14 @@ class BunnyUserIntegration {
         $user = get_userdata($userId);
         $username = $user ? sanitize_title($user->user_login) : "user_{$userId}";
         $collectionName = "wpbs_{$username}";
-        $collectionId = $this->databaseManager->getCollectionByName($collectionName);
+        $collectionId = $this->collectionHandler->getCollectionByName($collectionName);
 
         if ($collectionId) {
-            $response = $this->bunnyApi->deleteCollection($collectionId);
+            $response = BunnyCollectionHandler::getInstance()->deleteCollection($collectionId);
             if (is_wp_error($response)) {
-                error_log('Failed to delete collection for user ' . $userId . ': ' . $response->get_error_message());
+                BunnyLogger::log('Failed to delete collection for user ' . $userId . ': ' . $response->get_error_message());
             } else {
-                error_log("Collection {$collectionId} for user {$userId} deleted successfully.");
+                BunnyLogger::log("Collection {$collectionId} for user {$userId} deleted successfully.");
             }
             
             // Remove collection record from the database

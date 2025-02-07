@@ -19,9 +19,15 @@ document.addEventListener("DOMContentLoaded", function () {
     const file = fileInput.files[0];
     const allowedTypes = ["video/mp4", "video/webm"];
     const maxFileSize = bunnyUploadVars.maxFileSize;
+    const ajaxUrl = bunnyUploadVars.ajaxUrl || ajaxurl;
 
     if (!allowedTypes.includes(file.type)) {
       alert("Invalid file type. Please upload an MP4 or WebM video.");
+      return;
+    }
+
+    if (file.size === 0) {
+      alert("The selected file is empty. Please choose a valid video file.");
       return;
     }
 
@@ -41,11 +47,12 @@ document.addEventListener("DOMContentLoaded", function () {
       formData.append("post_id", postId);
     }
 
-    // Display loading message
+    // Display loading message and disable button
+    uploadButton.disabled = true;
     statusMessage.textContent = "Uploading...";
     statusMessage.style.color = "blue";
 
-    fetch(ajaxurl, {
+    fetch(ajaxUrl, {
       method: "POST",
       body: formData,
     })
@@ -73,6 +80,9 @@ document.addEventListener("DOMContentLoaded", function () {
         console.error("Upload error:", error);
         statusMessage.textContent = "An unexpected error occurred.";
         statusMessage.style.color = "red";
+      })
+      .finally(() => {
+        uploadButton.disabled = false; // Re-enable button after upload completes
       });
   });
 });

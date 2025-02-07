@@ -2,6 +2,8 @@
 
 namespace WP_BunnyStream\API;
 
+use WP_BunnyStream\API\BunnyApiClient;
+
 if (!defined('ABSPATH')) {
     exit; // Exit if accessed directly.
 }
@@ -9,15 +11,15 @@ if (!defined('ABSPATH')) {
 class BunnyApiKeyManager {
 
     /**
-     * BunnyApi instance.
+     * BunnyApiClient instance.
      */
-    private $bunnyApi;
+    private $bunnyApiClient;
 
     /**
      * Constructor
      */
     public function __construct() {
-        $this->bunnyApi = \BunnyApiInstance::getInstance();
+        $this->bunnyApiClient = BunnyApiClient::getInstance();
     }
 
     /**
@@ -46,10 +48,10 @@ class BunnyApiKeyManager {
     /**
      * Retrieve decrypted API key from database.
      */
-    public function getApiKey() {
+    public static function getApiKey() {
         $encrypted_key = get_option('bunny_net_access_key', '');
         return self::decrypt_api_key($encrypted_key);
-    }
+    }    
 
     /**
      * Handle AJAX request to update database settings.
