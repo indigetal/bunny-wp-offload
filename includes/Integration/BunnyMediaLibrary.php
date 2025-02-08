@@ -111,10 +111,7 @@ class BunnyMediaLibrary {
     
         // Step 6: Store metadata for later reference.
         BunnyMetadataManager::storeVideoMetadata($post_id, [
-            'source' => 'bunnycdn',
-            'videoUrl' => $uploadResponse['videoUrl'],
             'collectionId' => $collectionId,
-            'videoGuid' => $uploadResponse['videoId'],
         ]);
     
         BunnyLogger::log("Video offloaded successfully. Video ID: " . $uploadResponse['videoId'], 'info');
