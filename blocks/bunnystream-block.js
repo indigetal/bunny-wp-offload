@@ -144,7 +144,47 @@ wp.blocks.registerBlockType("bunnystream/video", {
         {},
         wp.element.createElement(
           wp.components.PanelBody,
-          { title: "Embed Settings", initialOpen: true },
+          { title: "General", initialOpen: true },
+          wp.element.createElement(
+            wp.components.Button,
+            {
+              isSecondary: true,
+              style: {
+                backgroundColor: "transparent",
+                border: "1px solid #007cba",
+                color: "#007cba",
+                marginBottom: "10px",
+                width: "100%",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+              },
+              onClick: () => {
+                const selectionModal = new wp.media.view.MediaFrame.Select({
+                  title: "Select or Upload Video",
+                  library: { type: "video" },
+                  button: { text: "Select Video" },
+                  multiple: false,
+                });
+
+                selectionModal.on("select", function () {
+                  const attachment = selectionModal.state().get("selection").first().toJSON();
+                  wp.apiFetch({
+                    path: `/wp/v2/media/${attachment.id}?_fields=id,meta`,
+                    method: "GET",
+                  }).then((attachmentData) => {
+                    if (attachmentData?.meta?._bunny_iframe_url) {
+                      setAttributes({ iframeUrl: attachmentData.meta._bunny_iframe_url });
+                    }
+                  });
+                });
+
+                selectionModal.open();
+              },
+            },
+            "Upload Video"
+          ),
+
           wp.element.createElement(wp.components.ToggleControl, {
             label: "Autoplay",
             checked: attributes.autoplay,
