@@ -78,4 +78,16 @@ class BunnyMetadataManager {
         return array_map('sanitize_text_field', $videoData);
     }
 
+    public static function register_bunny_stream_meta() {
+        register_meta('post', '_bunny_iframe_url', [
+            'type'         => 'string',
+            'description'  => 'Bunny Stream Embed URL',
+            'single'       => true,
+            'show_in_rest' => true, // This exposes it in the REST API
+        ]);
+    }
 }
+
+// Register meta on WordPress init
+add_action('init', ['WP_BunnyStream\Integration\BunnyMetadataManager', 'register_bunny_stream_meta']);
+

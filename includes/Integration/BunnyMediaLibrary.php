@@ -118,16 +118,13 @@ class BunnyMediaLibrary {
         return $upload;
     }        
 
-    /**
-     * Store Bunny.net metadata when an attachment is added
-     */
     public function handleAttachmentMetadata($post_id) {
         // Check if this attachment is a video.
         $mime = get_post_mime_type($post_id);
         if (strpos($mime, 'video/') !== 0) {
             return;
         }
-
+    
         // Prevent WP Offload Media from triggering multiple uploads
         if (class_exists('AS3CF_Plugin')) {
             BunnyLogger::log("handleAttachmentMetadata: WP Offload Media detected. Skipping duplicate execution.", 'warning');
@@ -165,7 +162,7 @@ class BunnyMediaLibrary {
     
         // Build a minimal upload array for offloadVideo().
         $upload_data = ['file' => $filePath];
-
+    
         BunnyLogger::log("handleAttachmentMetadata: Calling offloadVideo() for post ID {$post_id}.", 'debug');
     
         // Call offloadVideo() to offload the video.
@@ -175,12 +172,18 @@ class BunnyMediaLibrary {
             return;
         }
     
-        // Optionally, update the attachment's URL and metadata.
+        // Store `_bunny_video_id`
         if (isset($result['video_id'])) {
             update_post_meta($post_id, '_bunny_video_id', $result['video_id']);
             BunnyLogger::log("handleAttachmentMetadata: Offloading succeeded for post ID {$post_id}.", 'info');
-        }        
-    }   
+        }  
+    
+        // Store `_bunny_iframe_url`
+        if (isset($result['iframeUrl'])) {
+            update_post_meta($post_id, '_bunny_iframe_url', esc_url($result['iframeUrl']));
+            BunnyLogger::log("handleAttachmentMetadata: Saved _bunny_iframe_url for post ID {$post_id}: " . esc_url($result['iframeUrl']), 'info');
+        }
+    }       
     
     /**
      * Override wp_get_attachment_metadata to use Bunny.net thumbnails if available.

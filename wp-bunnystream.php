@@ -22,7 +22,6 @@ require_once plugin_dir_path(__FILE__) . 'includes/Integration/BunnyMetadataMana
 require_once plugin_dir_path(__FILE__) . 'includes/Integration/BunnyUserIntegration.php';
 require_once plugin_dir_path(__FILE__) . 'includes/Integration/BunnyMediaLibrary.php';
 require_once plugin_dir_path(__FILE__) . 'includes/Utils/BunnyLogger.php';
-require_once plugin_dir_path(__FILE__) . 'includes/Blocks/BunnyStreamBlock.php';
 
 // Import the Constants class
 use WP_BunnyStream\Utils\Constants;
@@ -41,55 +40,74 @@ function wp_bunnystream_init() {
 add_action('plugins_loaded', 'wp_bunnystream_init');
 
 /**
- * Enqueue admin scripts for Bunny.net integration.
+ * Register the block.
  */
-function wp_bunnystream_enqueue_admin_scripts($hook) {
-    // Load video upload scripts for Media Library & post editor pages
-    if (in_array($hook, ['upload.php', 'post.php', 'post-new.php'])) {
-        wp_enqueue_script(
-            'bunny-video-upload',
-            plugin_dir_url(__FILE__) . 'assets/js/bunny-video-upload.js',
-            ['jquery'],
-            null,
-            true
-        );
-
-        wp_localize_script('bunny-video-upload', 'bunnyUploadVars', [
-            'ajaxUrl'     => admin_url('admin-ajax.php'),
-            'nonce'       => wp_create_nonce('bunny_nonce'),
-            'maxFileSize' => Constants::MAX_FILE_SIZE,
-        ]);
-    }
-}
-add_action('admin_enqueue_scripts', 'wp_bunnystream_enqueue_admin_scripts');
-
-/**
- * Enqueue scripts for Bunny.net video uploads on the frontend for Tutor LMS integration.
- */
-function enqueue_bunny_frontend_scripts() {
-    // Ensure the function is available
-    include_once( ABSPATH . 'wp-admin/includes/plugin.php' );
-
-    // Check if Tutor LMS is active
-    if (!is_plugin_active('tutor/tutor.php')) {
-        return;
-    }
-
-    wp_enqueue_script(
-        'bunny-video-upload',
-        plugin_dir_url(__FILE__) . 'assets/js/bunny-video-upload.js',
-        ['jquery'],
-        null,
+function wp_bunnystream_register_block() {
+    wp_register_script(
+        'bunnystream-block-editor',
+        plugins_url('assets/js/bunnystream-block.js', __FILE__),
+        ['wp-blocks', 'wp-editor', 'wp-components', 'wp-element', 'wp-i18n', 'wp-block-editor'],
+        filemtime(plugin_dir_path(__FILE__) . 'assets/js/bunnystream-block.js'),
         true
     );
 
-    wp_localize_script('bunny-video-upload', 'bunnyUploadVars', [
-        'ajaxurl'     => admin_url('admin-ajax.php'),
-        'nonce'       => wp_create_nonce('bunny_nonce'),
-        'maxFileSize' => Constants::MAX_FILE_SIZE,
-    ]);
+    wp_register_style(
+        'bunnystream-block-style',
+        plugins_url('assets/css/bunny-block.css', __FILE__),
+        [],
+        filemtime(plugin_dir_path(__FILE__) . 'assets/css/bunny-block.css')
+    );
+
+    register_block_type('bunnystream/video', array(
+        'editor_script' => 'bunnystream-block-editor',
+        'editor_style'  => 'bunnystream-block-style',
+        'style'         => 'bunnystream-block-style',
+        'render_callback' => 'bunnystream_render_video',
+    ));
 }
-add_action('wp_enqueue_scripts', 'enqueue_bunny_frontend_scripts');
+add_action('init', 'wp_bunnystream_register_block', 20);
+
+/**
+ * Render callback for the Bunny Stream Video block.
+ */
+function bunnystream_render_video($attributes) {
+    $post_id = get_the_ID();
+    $iframe_url = !empty($attributes['iframeUrl']) ? $attributes['iframeUrl'] : get_post_meta($post_id, '_bunny_iframe_url', true);
+
+    // Debugging: Log metadata and attributes
+    $meta = get_post_meta($post_id);
+    error_log("bunnystream_render_video() - Full Post Meta for $post_id: " . print_r($meta, true));
+    error_log("bunnystream_render_video() - Attributes: " . print_r($attributes, true));
+
+    if (empty($iframe_url)) {
+        return '<p style="text-align:center; padding:10px; background:#f5f5f5; border-radius:5px; color: red;">
+            ' . esc_html__("No video URL found for this post. Please ensure a video is selected in the block editor and check the Media Library for _bunny_iframe_url.", "bunnystream") . 
+            '<br><small>' . esc_html__("Post ID: ", "bunnystream") . esc_html($post_id) . '</small></p>';
+    }
+
+    // Construct query parameters from block attributes
+    $params = [];
+    if (isset($attributes['autoplay']) && $attributes['autoplay']) $params[] = "autoplay=true";
+    if (isset($attributes['muted']) && $attributes['muted']) $params[] = "muted=true";
+    if (isset($attributes['loop']) && $attributes['loop']) $params[] = "loop=true";
+    if (isset($attributes['playsInline']) && $attributes['playsInline']) $params[] = "playsinline=true";
+    if (!empty($attributes['captions'])) $params[] = "captions=" . urlencode($attributes['captions']);
+    if (isset($attributes['preload']) && $attributes['preload']) $params[] = "preload=" . urlencode($attributes['preload']);
+    if (!empty($attributes['t'])) $params[] = "t=" . urlencode($attributes['t']);
+    if (isset($attributes['chromecast']) && !$attributes['chromecast']) $params[] = "chromecast=false";
+    if (isset($attributes['disableAirplay']) && $attributes['disableAirplay']) $params[] = "disableAirplay=true";
+    if (isset($attributes['disableIosPlayer']) && $attributes['disableIosPlayer']) $params[] = "disableIosPlayer=true";
+    if (isset($attributes['showHeatmap']) && $attributes['showHeatmap']) $params[] = "showHeatmap=true";
+    if (isset($attributes['showSpeed']) && $attributes['showSpeed']) $params[] = "showSpeed=true";
+
+    // Construct the final iframe URL
+    $embed_url = esc_url($iframe_url) . (!empty($params) ? '?' . implode("&", $params) : '');
+
+    // Log final embed URL
+    error_log("bunnystream_render_video() - Final Embed URL: " . $embed_url);
+
+    return "<iframe src='{$embed_url}' allow='accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;' allowfullscreen='true'></iframe>";
+}
 
 /**
  * Register scheduled event for retrying playback URL retrieval.
@@ -97,3 +115,13 @@ add_action('wp_enqueue_scripts', 'enqueue_bunny_frontend_scripts');
 add_action('wpbs_retry_fetch_video_url', function($videoId, $postId) {
     \WP_BunnyStream\API\BunnyApiClient::getInstance()->retryFetchVideoPlaybackUrl($videoId, $postId);
 }, 10, 2);
+
+function wp_bunnystream_enqueue_frontend_assets() {
+    wp_enqueue_style('bunnystream-block-style');
+}
+add_action('wp_enqueue_scripts', 'wp_bunnystream_enqueue_frontend_assets');
+
+function wp_bunnystream_load_textdomain() {
+    load_plugin_textdomain('bunnystream-video', false, dirname(plugin_basename(__FILE__)) . '/languages');
+}
+add_action('plugins_loaded', 'wp_bunnystream_load_textdomain');
