@@ -40,11 +40,50 @@ wp.blocks.registerBlockType("bunnystream/video", {
       }
     }, [attributes.iframeUrl]);
 
+    function openFileUploader() {
+      const uploadInput = document.createElement("input");
+      uploadInput.type = "file";
+      uploadInput.accept = "video/*";
+      uploadInput.style.display = "none";
+
+      uploadInput.addEventListener("change", function (event) {
+        const file = event.target.files[0];
+
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("action", "upload-attachment");
+        formData.append("_wpnonce", wp.media.model.settings.post.nonce);
+
+        wp.apiFetch({
+          url: wp.ajax.settings.url,
+          method: "POST",
+          body: formData,
+        }).then((response) => {
+          if (response?.id) {
+            wp.apiFetch({
+              path: `/wp/v2/media/${response.id}?_fields=id,meta`,
+              method: "GET",
+            }).then((attachmentData) => {
+              if (attachmentData?.meta?._bunny_iframe_url) {
+                setAttributes({ iframeUrl: attachmentData.meta._bunny_iframe_url });
+              }
+            });
+          }
+        });
+      });
+
+      document.body.appendChild(uploadInput);
+      uploadInput.click();
+      document.body.removeChild(uploadInput);
+    }
+
     function openMediaUploader() {
       const fileFrame = wp.media({
-        title: "Upload or Select a Video",
+        title: "Media Library",
         library: { type: "video" },
-        button: { text: "Use this Video" },
+        button: { text: "Media Library" },
         multiple: false,
       });
 
@@ -128,29 +167,39 @@ wp.blocks.registerBlockType("bunnystream/video", {
           })
         )
       ),
-      wp.element.createElement(
-        wp.components.Placeholder,
-        {
-          icon: "video-alt2",
-          label: "Bunny Stream Video",
-          instructions: "Upload or select a video from the media library.",
-        },
-        embedUrl
-          ? wp.element.createElement("iframe", {
-              src: embedUrl,
-              width: "100%",
-              height: "180",
-              style: { border: "none" },
-            })
-          : wp.element.createElement(
+      !embedUrl
+        ? wp.element.createElement(
+            wp.components.Placeholder,
+            {
+              icon: "video-alt2",
+              label: "Bunny Stream Video",
+              instructions: "Upload a video file or pick one from your media library.",
+            },
+            wp.element.createElement(
               wp.components.Button,
               {
                 isPrimary: true,
-                onClick: openMediaUploader,
+                onClick: openFileUploader,
+                style: { backgroundColor: "#007cba", color: "white", marginRight: "10px" },
               },
               "Upload Video"
+            ),
+            wp.element.createElement(
+              wp.components.Button,
+              {
+                isSecondary: true,
+                onClick: openMediaUploader,
+                style: { backgroundColor: "white", border: "1px solid #007cba", color: "#007cba" },
+              },
+              "Media Library"
             )
-      )
+          )
+        : wp.element.createElement("iframe", {
+            src: embedUrl,
+            width: "100%",
+            height: "180",
+            style: { border: "none" },
+          })
     );
   },
 

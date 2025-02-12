@@ -45,9 +45,9 @@ add_action('plugins_loaded', 'wp_bunnystream_init');
 function wp_bunnystream_register_block() {
     wp_register_script(
         'bunnystream-block-editor',
-        plugins_url('blocks/bunnystream-block.php', __FILE__),
+        plugins_url('blocks/bunnystream-block.js', __FILE__),
         ['wp-blocks', 'wp-editor', 'wp-components', 'wp-element', 'wp-i18n', 'wp-block-editor'],
-        filemtime(plugin_dir_path(__FILE__) . 'blocks/bunnystream-block.php'),
+        filemtime(plugin_dir_path(__FILE__) . 'blocks/bunnystream-block.js'),
         true
     );
     
