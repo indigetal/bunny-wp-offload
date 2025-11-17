@@ -54,9 +54,6 @@ if (!defined('ABSPATH')) {
     <?php if ($showApiKeyAlert): ?>
         <div class="alert red bn-m-5">Could not connect to api.bunny.net. Please make sure the API key is correct.</div>
     <?php endif; ?>
-    <?php if ($showCdnAccelerationAlert): ?>
-        <div class="bn-m-5 bn-mb-0"><?php echo $this->renderPartialFile('cdn-acceleration.alert.php'); ?></div>
-    <?php endif; ?>
     <section class="bn-section statistics">
         <?php echo $this->renderPartialFile('offloader.statistics.php', ['attachments' => $attachments, 'config' => $config, 'attachmentsWithError' => $attachmentsWithError]) ?>
     </section>

@@ -48,14 +48,28 @@ class Client
             $options['body'] = $body;
         }
         $response = $this->httpClient->request($method, $uri, $options);
-        if (401 === $response->getStatusCode()) {
+        $statusCode = $response->getStatusCode();
+        
+        if (401 === $statusCode) {
             throw new AuthorizationException();
         }
-        if (404 === $response->getStatusCode()) {
+        if (404 === $statusCode) {
             throw new NotFoundException();
         }
-        if ($response->getStatusCode() < 200 || $response->getStatusCode() > 299) {
-            throw new \Exception('api.bunny.net: no response ('.$response->getStatusCode().')');
+        if ($statusCode < 200 || $statusCode > 299) {
+            // Try to get error details from response body
+            $errorBody = $response->getBody()->getContents();
+            $errorDetails = json_decode($errorBody, true);
+            
+            if (is_array($errorDetails) && isset($errorDetails['Message'])) {
+                throw new \Exception('api.bunny.net: '.$errorDetails['Message'].' ('.$statusCode.')');
+            } elseif (is_array($errorDetails) && isset($errorDetails['ErrorKey'])) {
+                throw new \Exception('api.bunny.net: '.$errorDetails['ErrorKey'].' ('.$statusCode.')');
+            } elseif (!empty($errorBody)) {
+                throw new \Exception('api.bunny.net: '.$errorBody.' ('.$statusCode.')');
+            }
+            
+            throw new \Exception('api.bunny.net: no response ('.$statusCode.')');
         }
         $data = json_decode($response->getBody()->getContents(), true);
         if (null === $data) {
