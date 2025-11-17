@@ -83,6 +83,7 @@ class ComposerStaticInitfeee8c527db0357bf3c06e907f53ea95
         'Bunny\\Wordpress\\Admin\\Controller\\Stream' => __DIR__ . '/../..' . '/src/Admin/Controller/Stream.php',
         'Bunny\\Wordpress\\Admin\\Controller\\Wizard' => __DIR__ . '/../..' . '/src/Admin/Controller/Wizard.php',
         'Bunny\\Wordpress\\Admin\\Router' => __DIR__ . '/../..' . '/src/Admin/Router.php',
+        'Bunny\\Wordpress\\Api\\Billing\\Info' => __DIR__ . '/../..' . '/src/Api/Billing/Info.php',
         'Bunny\\Wordpress\\Api\\Client' => __DIR__ . '/../..' . '/src/Api/Client.php',
         'Bunny\\Wordpress\\Api\\Config' => __DIR__ . '/../..' . '/src/Api/Config.php',
         'Bunny\\Wordpress\\Api\\Exception\\AccountNotActivatedException' => __DIR__ . '/../..' . '/src/Api/Exception/AccountNotActivatedException.php',

@@ -321,14 +321,19 @@ window.addEventListener('load', () => {
 
     document.querySelector('article.offloader form')?.addEventListener('submit', function (event) {
         const isEnabled = document.getElementById('offloader-enabled').checked;
+        const isRemoveLocal = document.getElementById('offloader-remove-local')?.checked || false;
 
         if (document.getElementById('offloader-enabled').checked != document.getElementById('offloader-enabled').defaultChecked) {
             event.preventDefault();
 
-            if (isEnabled) {
+            if (isEnabled && isRemoveLocal) {
+                // Only show warning modal when both offloading AND removing local files
                 jQuery('#modal-offloader-enable').fadeIn();
-            } else {
+            } else if (!isEnabled) {
                 jQuery('#modal-offloader-disable').fadeIn();
+            } else {
+                // Offloader enabled but not removing local files - allow submit without modal
+                event.target.submit();
             }
         }
     });

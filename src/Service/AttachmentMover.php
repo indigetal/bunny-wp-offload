@@ -223,10 +223,12 @@ class AttachmentMover
             $this->db->query('ROLLBACK');
             throw $e;
         }
-        // delete original files
-        foreach ($filesToUpload as $localPath => $remotePath) {
-            if (file_exists($localPath)) {
-                unlink($localPath);
+        // Only delete original files if remove_local setting is enabled
+        if ($this->config->isRemoveLocal()) {
+            foreach ($filesToUpload as $localPath => $remotePath) {
+                if (file_exists($localPath)) {
+                    unlink($localPath);
+                }
             }
         }
     }
@@ -341,10 +343,13 @@ class AttachmentMover
             $this->db->query('ROLLBACK');
             throw $e;
         }
-        foreach ($files as $file) {
-            $local_path = ABSPATH.$file;
-            if (file_exists($local_path)) {
-                @unlink($local_path);
+        // Only delete local files if remove_local setting is enabled
+        if ($this->config->isRemoveLocal()) {
+            foreach ($files as $file) {
+                $local_path = ABSPATH.$file;
+                if (file_exists($local_path)) {
+                    @unlink($local_path);
+                }
             }
         }
     }

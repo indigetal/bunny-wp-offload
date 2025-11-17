@@ -23,6 +23,16 @@ namespace {
         // Migration from V1 removed - simplified plugin no longer needs legacy migration
         // Plugin activation is handled by WordPress
     }
+
+    function bunnycdn_plugin_upgraded(): void
+    {
+        // Migration: Split offload/remove functionality (v1.0.4)
+        // If offloader was enabled, assume they want remove_local = true (maintain current behavior)
+        if (get_option('bunnycdn_offloader_enabled') && false === get_option('bunnycdn_offloader_remove_local')) {
+            update_option('bunnycdn_offloader_remove_local', true);
+        }
+    }
+
     function bunnycdn_uninstall_plugin(): void
     {
         require_once __DIR__.'/../vendor/autoload.php';

@@ -29,6 +29,7 @@ class Offloader
     private string $storageZone;
     private int $storageZoneId;
     private bool $syncExisting;
+    private bool $removeLocal;
     private ?string $syncTokenHash;
     /** @var string[] */
     private array $excluded;
@@ -36,7 +37,7 @@ class Offloader
     /**
      * @param string[] $excluded
      */
-    public function __construct(bool $enabled, bool $configured, string $storageZone, int $storageZoneId, string $storagePassword, bool $syncExisting, ?string $syncTokenHash, array $excluded)
+    public function __construct(bool $enabled, bool $configured, string $storageZone, int $storageZoneId, string $storagePassword, bool $syncExisting, bool $removeLocal, ?string $syncTokenHash, array $excluded)
     {
         $this->enabled = $enabled;
         $this->configured = $configured;
@@ -44,6 +45,7 @@ class Offloader
         $this->storageZone = $storageZone;
         $this->storageZoneId = $storageZoneId;
         $this->syncExisting = $syncExisting;
+        $this->removeLocal = $removeLocal;
         $this->syncTokenHash = $syncTokenHash;
         $this->excluded = $excluded;
     }
@@ -78,6 +80,11 @@ class Offloader
         return $this->syncExisting;
     }
 
+    public function isRemoveLocal(): bool
+    {
+        return $this->removeLocal;
+    }
+
     public function getSyncTokenHash(): ?string
     {
         return $this->syncTokenHash;
@@ -102,6 +109,7 @@ class Offloader
     {
         $this->enabled = isset($postData['enabled']) && '1' === $postData['enabled'];
         $this->syncExisting = isset($postData['sync_existing']) && '1' === $postData['sync_existing'];
+        $this->removeLocal = isset($postData['remove_local']) && '1' === $postData['remove_local'];
         if (!empty($postData['storage_password'])) {
             $this->storagePassword = (string) $postData['storage_password'];
         }
@@ -118,6 +126,7 @@ class Offloader
         update_option('bunnycdn_offloader_enabled', $this->enabled);
         update_option('bunnycdn_offloader_storage_password', $this->storagePassword);
         update_option('bunnycdn_offloader_sync_existing', $this->syncExisting);
+        update_option('bunnycdn_offloader_remove_local', $this->removeLocal);
         update_option('bunnycdn_offloader_excluded', $this->excluded);
     }
 
@@ -128,12 +137,13 @@ class Offloader
         $storageZoneId = (int) get_option('bunnycdn_offloader_storage_zoneid', 0);
         $storagePassword = (string) get_option('bunnycdn_offloader_storage_password', '');
         $syncExisting = (bool) get_option('bunnycdn_offloader_sync_existing', false);
+        $removeLocal = (bool) get_option('bunnycdn_offloader_remove_local', false);
         $syncTokenHash = (string) get_option('bunnycdn_offloader_sync_token_hash', '');
         $excluded = (array) get_option('bunnycdn_offloader_excluded', []);
         $configured = !empty($storageZone) && !empty($storagePassword);
         $syncTokenHash = '' === $syncTokenHash ? null : $syncTokenHash;
 
-        return new self($enabled, $configured, $storageZone, $storageZoneId, $storagePassword, $syncExisting, $syncTokenHash, $excluded);
+        return new self($enabled, $configured, $storageZone, $storageZoneId, $storagePassword, $syncExisting, $removeLocal, $syncTokenHash, $excluded);
     }
 
     public function saveSyncOptions(string $pathPrefix, string $syncTokenHash): void

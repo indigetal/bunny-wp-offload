@@ -24,6 +24,7 @@ return array(
     'Bunny\\Wordpress\\Admin\\Controller\\Stream' => $baseDir . '/src/Admin/Controller/Stream.php',
     'Bunny\\Wordpress\\Admin\\Controller\\Wizard' => $baseDir . '/src/Admin/Controller/Wizard.php',
     'Bunny\\Wordpress\\Admin\\Router' => $baseDir . '/src/Admin/Router.php',
+    'Bunny\\Wordpress\\Api\\Billing\\Info' => $baseDir . '/src/Api/Billing/Info.php',
     'Bunny\\Wordpress\\Api\\Client' => $baseDir . '/src/Api/Client.php',
     'Bunny\\Wordpress\\Api\\Config' => $baseDir . '/src/Api/Config.php',
     'Bunny\\Wordpress\\Api\\Exception\\AccountNotActivatedException' => $baseDir . '/src/Api/Exception/AccountNotActivatedException.php',

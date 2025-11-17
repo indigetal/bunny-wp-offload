@@ -116,13 +116,20 @@ if (!defined('ABSPATH')) {
             <?php endif; ?>
             <div>
                 <input type="checkbox" class="bunnycdn-toggle" id="offloader-enabled" name="offloader[enabled]" value="1" <?php echo $config->isEnabled() ? 'checked' : '' ?> />
-                <label for="offloader-enabled">Content Offloading</label>
+                <label for="offloader-enabled">Offload Media</label>
             </div>
-            <p class="bn-mt-2">New media uploads will be stored <em>exclusively</em> in the Bunny Storage.</p>
+            <p class="bn-mt-2">Copies media files to Bunny Storage after being uploaded, edited, or optimized.</p>
             <input type="submit" value="Save Settings" class="bunnycdn-button bunnycdn-button--primary bunnycdn-button--lg bn-mt-2 hide-enabled <?php echo $config->isEnabled() ? 'bn-d-none' : '' ?>">
         </section>
         <section class="bn-section bn-px-0 bn-pt-0 hide-disabled bn-section--no-divider <?php echo $config->isEnabled() ? '' : 'bn-d-none' ?>">
-            <ul class="bn-m-0">
+            <ul class="bn-m-0 bn-mt-4">
+                <li class="bn-section bn-px-0">
+                    <div>
+                        <input type="checkbox" class="bunnycdn-toggle" id="offloader-remove-local" name="offloader[remove_local]" value="1" <?php echo $config->isRemoveLocal() ? 'checked' : '' ?> />
+                        <label for="offloader-remove-local">Remove Local Media</label>
+                    </div>
+                    <p class="bn-mt-2">Frees up storage space by deleting local media files after they have been offloaded.</p>
+                </li>
                 <li class="bn-section bn-px-0 bn-section--split">
                     <label class="bn-section__title" for="offloader-storage-region">Storage Region</label>
                     <div class="bn-section__content">
@@ -240,18 +247,15 @@ if (!defined('ABSPATH')) {
         <img src="<?php echo esc_attr($this->assetUrl('icon-alert.svg')) ?>" alt="alert icon">
         <h2>WARNING</h2>
         <p>
-            With the offloader enabled, newly uploaded images in WordPress are stored in Bunny Storage, not on your server.
+            With "Remove Local Media" enabled, media files will be deleted from your server after being offloaded to Bunny Storage.
             To reverse this, you must manually transfer the images back, understanding the associated risks.
-        </p>
-        <p>
-            For image acceleration without altering storage, just use Bunny <a href="<?php echo esc_attr($cdnUrl) ?>">CDN</a>.
         </p>
         <div class="modal-confirm">
             <input type="checkbox" class="bunnycdn-toggle" id="modal-offloader-enable-checkbox">
-            <label for="modal-offloader-enable-checkbox" class="bn-text-200-regular">I understand this action transfers my content to bunny.net</label>
+            <label for="modal-offloader-enable-checkbox" class="bn-text-200-regular">I understand this will delete local media files after offloading</label>
         </div>
         <div class="modal-buttons">
-            <button class="bunnycdn-button bunnycdn-button--danger bunnycdn-button--lg" id="modal-offloader-enable-confirm" disabled>Enable Content Offloading</button>
+            <button class="bunnycdn-button bunnycdn-button--danger bunnycdn-button--lg" id="modal-offloader-enable-confirm" disabled>Enable Remove Local Media</button>
             <button class="bunnycdn-button bunnycdn-button--secondary bunnycdn-button--lg" id="modal-offloader-enable-cancel">Cancel</button>
         </div>
     </div>
