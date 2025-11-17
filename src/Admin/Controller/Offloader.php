@@ -133,29 +133,10 @@ class Offloader implements ControllerInterface
                 }
             }
         }
-        $cdnUrl = $this->container->getSectionUrl('cdn');
-        if (!$offloaderConfig->isConfigured()) {
-            try {
-                $record = $this->container->getCdnAcceleration()->getDNSRecord();
-                $pullzoneId = $record->getAcceleratedPullzoneId();
-                if (null === $pullzoneId) {
-                    throw new \Exception('We could not find an accelerated pullzone for this domain.');
-                }
-                $pullzone = $this->container->getApiClient()->getPullzoneDetails($pullzoneId);
-                $pathPrefix = $this->container->getPathPrefix();
-                $storageZoneId = $this->container->getOffloaderUtils()->checkForExistingEdgeRule($pullzone, $pathPrefix);
-                if (null !== $storageZoneId) {
-                    try {
-                        $storageZone = $this->container->getApiClient()->getStorageZone($storageZoneId);
-                        $offloaderConfig->setStorageZone($storageZone);
-                    } catch (NotFoundException $e) {
-                        throw new \Exception('There is an Edge Rule configured for this WordPress, but it is pointing to a Storage Zone that does not exist.');
-                    }
-                }
-            } catch (\Exception $e) {
-                $errorMessage = 'Enabling the Content Offloading will not be possible: '.$e->getMessage();
-            }
-        }
+        // CDN URL removed - CDN section no longer exists
+        // Auto-detection of existing edge rules removed - CDN/Pullzone features out of scope
+        // Offloader must be configured through wizard (creates Storage Zone directly)
+        $cdnUrl = ''; // CDN section removed, keeping variable for template compatibility (to be removed in Priority 3)
         $showOffloaderSyncErrors = $offloaderConfig->isEnabled() && $offloaderConfig->isSyncExisting() && $this->container->getAttachmentCounter()->countWithError() > 0;
         $this->container->renderTemplateFile('offloader.config.php', ['attachments' => $attachmentCount, 'attachmentsWithError' => $this->container->getAttachmentCounter()->countWithError(), 'cdnUrl' => $cdnUrl, 'config' => $offloaderConfig, 'errorMessage' => $errorMessage, 'replicationRegions' => OffloaderConfig::STORAGE_REGIONS_SSD, 'showApiKeyAlert' => $showApiKeyAlert, 'showCdnAccelerationAlert' => $showCdnAccelerationAlert, 'showOffloaderSyncErrors' => $showOffloaderSyncErrors, 'successMessage' => $successMessage, 'viewOriginFileUrlTemplateSafe' => $this->container->getSectionUrl('attachment', ['location' => 'origin', 'id' => '{{id}}']), 'viewStorageFileUrlTemplateSafe' => $this->container->getSectionUrl('attachment', ['location' => 'storage', 'id' => '{{id}}'])], ['cssClass' => 'offloader']);
     }

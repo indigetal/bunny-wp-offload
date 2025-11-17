@@ -20,53 +20,43 @@ declare(strict_types=1);
 namespace Bunny\Wordpress\Service;
 
 use Bunny\Wordpress\Api\Client;
-use Bunny\Wordpress\Api\Pullzone;
 use Bunny\Wordpress\Api\Storagezone;
 use Bunny\Wordpress\Config\Offloader as OffloaderConfig;
 use Bunny\Wordpress\Utils\Offloader as OffloaderUtils;
 
 class OffloaderSetup
 {
-    private const PULLZONE_EDGERULE_DESCRIPTION = 'WordPress Content Offloading';
+    // Simplified - Pullzone/CDN setup removed, Storage Zone only
     private Client $api;
-    private CdnAcceleration $cdnAcceleration;
     private OffloaderUtils $offloaderUtils;
     private string $pathPrefix;
 
-    public function __construct(Client $api, CdnAcceleration $cdnAcceleration, OffloaderUtils $offloaderUtils, string $pathPrefix)
+    public function __construct(Client $api, OffloaderUtils $offloaderUtils, string $pathPrefix)
     {
         $this->api = $api;
-        $this->cdnAcceleration = $cdnAcceleration;
         $this->offloaderUtils = $offloaderUtils;
         $this->pathPrefix = $pathPrefix;
     }
 
     /**
      * @param array<string, mixed> $postData
+     * Simplified - no Pullzone/CDN setup, Storage Zone only
      */
     public function perform(array $postData): void
     {
         $postData['storage_replication'] = $postData['storage_replication'] ?? [];
         $postData['sync_existing'] = $postData['sync_existing'] ?? '';
         $this->validatePost($postData);
-        $host = $this->cdnAcceleration->getRequestHost();
-        $record = $this->cdnAcceleration->getDNSRecord();
-        $pullzoneId = $record->getAcceleratedPullzoneId();
-        if (null === $pullzoneId) {
-            throw new \Exception('We could not find a pullzone for this domain.');
-        }
-        $pullzone = $this->api->getPullzoneDetails($pullzoneId);
+        
         [$syncToken, $syncTokenHash] = $this->offloaderUtils->generateSyncToken();
-        // setup storage zone
-        $storageZoneId = $this->offloaderUtils->checkForExistingEdgeRule($pullzone, $this->pathPrefix);
-        if (null === $storageZoneId) {
-            $storageZone = $this->createStorageZone($postData['storage_replication']);
-            $this->createEdgeRules($host, $pullzone, $storageZone, $this->pathPrefix);
-        } else {
-            $storageZone = $this->api->getStorageZone($storageZoneId);
-        }
-        $this->api->updateStorageZoneForOffloader($storageZone->getId(), $record->getZone()->getId(), $record->getId(), $this->pathPrefix, $syncToken);
-        // save configuration
+        
+        // Create Storage Zone for media offloading
+        $storageZone = $this->createStorageZone($postData['storage_replication']);
+        
+        // No Pullzone/edge rule configuration - CDN setup removed
+        // Storage Zone will be accessed directly for media delivery
+        
+        // Save offloader configuration
         update_option('bunnycdn_offloader_enabled', true);
         update_option('bunnycdn_offloader_excluded', []);
         update_option('bunnycdn_offloader_storage_zone', $storageZone->getName());
@@ -117,9 +107,4 @@ class OffloaderSetup
         throw new \Exception('Could not create storage zone.');
     }
 
-    private function createEdgeRules(string $hostname, Pullzone\Details $pullzone, Storagezone\Details $storageZone, string $pathPrefix): void
-    {
-        $urls = ['http://'.$hostname.$pathPrefix.'/wp-content/uploads/*', 'https://'.$hostname.$pathPrefix.'/wp-content/uploads/*'];
-        $this->api->addEdgeRuleToPullzone($pullzone->getId(), ['Enabled' => true, 'Description' => self::PULLZONE_EDGERULE_DESCRIPTION, 'ActionType' => 17, 'ActionParameter1' => $storageZone->getId(), 'ActionParameter2' => $storageZone->getName(), 'TriggerMatchingType' => 1, 'Triggers' => [['Type' => 0, 'PatternMatchingType' => 0, 'PatternMatches' => $urls]]]);
-    }
 }

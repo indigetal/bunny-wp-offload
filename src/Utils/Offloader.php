@@ -22,7 +22,6 @@ namespace Bunny\Wordpress\Utils;
 use Bunny\Storage\AuthenticationException;
 use Bunny\Wordpress\Api\Client;
 use Bunny\Wordpress\Api\Exception\AuthorizationException;
-use Bunny\Wordpress\Api\Pullzone;
 use Bunny\Wordpress\Config\Offloader as OffloaderConfig;
 use Bunny\Wordpress\Service\AttachmentCounter;
 use Bunny\Wordpress\Service\Exception\InvalidSQLQueryException;
@@ -121,38 +120,8 @@ class Offloader
         }
     }
 
-    public function checkForExistingEdgeRule(Pullzone\Details $pullzone, string $pathPrefix): ?int
-    {
-        $storageId = null;
-        foreach ($pullzone->getEdgerules() as $edgerule) {
-            if (!$edgerule->isEnabled()) {
-                continue;
-            }
-            if (!in_array($edgerule->getActionType(), [Pullzone\Edgerule::TYPE_ORIGIN_STORAGE, Pullzone\Edgerule::TYPE_ORIGIN_URL], true)) {
-                continue;
-            }
-            foreach ($edgerule->getTriggers() as $trigger) {
-                foreach ($trigger->getPatternMatches() as $pattern) {
-                    if (Pullzone\EdgeruleTrigger::PATTERN_MATCH_NONE === $trigger->getPatternMatchingType()) {
-                        continue;
-                    }
-                    if (parse_url($pattern, \PHP_URL_PATH) === $pathPrefix.'/wp-content/uploads/*') {
-                        if (Pullzone\Edgerule::TYPE_ORIGIN_STORAGE !== $edgerule->getActionType()) {
-                            throw new \Exception('The Pullzone associated with this website has Edge Rules that may conflict with the content offloading feature.');
-                        }
-                        $storageId = (int) $edgerule->getActionParameter1();
-                        if (0 === $storageId) {
-                            $storageId = null;
-                            continue;
-                        }
-                        break 3;
-                    }
-                }
-            }
-        }
-
-        return $storageId;
-    }
+    // checkForExistingEdgeRule() removed - edge rules are CDN/Pullzone feature
+    // Storage Zone is now accessed directly without edge rule validation
 
     public function resetFileLocks(int $until = \PHP_INT_MAX): void
     {
